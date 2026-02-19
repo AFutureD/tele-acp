@@ -1,0 +1,23 @@
+{
+  "languages": {
+    "Python": {
+      "formatter": {
+        "external": {
+          "command": "uv",
+          "arguments": ["run", "ruff", "format", "-"],
+        },
+      },
+      "format_on_save": "on",
+    },
+  },
+  "lsp": {
+    "ruff": {
+      "initialization_options": {
+        "settings": {
+          "exclude": ["*"],
+        },
+      },
+    },
+  },
+  "file_scan_exclusions": [".idea", "__pycache__", ".DS_Store"],
+}
