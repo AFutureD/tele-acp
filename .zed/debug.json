@@ -5,10 +5,11 @@
     "request": "launch",
     "module": "tele_acp.cli",
     "cwd": "$ZED_WORKTREE_ROOT",
+    "args": ["start"],
     // "args": ["auth", "list"],
     // "args": ["dialog", "list"],
     // "args": ["message", "list", "4281316593", "--range", "last week"],
     // "args": ["message", "list", "4281316593", "--from", "today", "-n", "200"],
-    "args": ["message", "send", "-1003870893788", "Hi"],
+    // "args": ["message", "send", "-1003870893788", "Hi"],
   },
 ]

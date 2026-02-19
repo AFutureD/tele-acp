@@ -80,15 +80,7 @@ def main(
     """Hei Hei"""
     _ = version
 
-    cli_args: SharedArgs = SharedArgs(fmt=fmt, config_file=config_file, session=session)
-    ctx.obj = cli_args
-
-    if ctx.invoked_subcommand:
-        return
-
-    ok = asyncio.run(mainloop(cli_args))
-    if not ok:
-        raise typer.Exit(code=1)
+    ctx.obj = SharedArgs(fmt=fmt, config_file=config_file, session=session)
 
 
 @cli.command(name="me")
@@ -112,5 +104,14 @@ def me_get(ctx: typer.Context) -> None:
         return True
 
     ok = asyncio.run(_run())
+    if not ok:
+        raise typer.Exit(code=1)
+
+
+@cli.command(name="start")
+def start(ctx: typer.Context) -> None:
+    cli_args: SharedArgs = ctx.obj
+
+    ok = asyncio.run(mainloop(cli_args))
     if not ok:
         raise typer.Exit(code=1)

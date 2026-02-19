@@ -1,8 +1,12 @@
 import asyncio
+import logging
 import os
 from typing import Any
 from tele_acp.telegram import TGClient
-import asyncio.subprocess as aio_subprocess
+
+from telethon import events
+import telethon
+from telethon.custom import Message
 
 from .types import SharedArgs
 from tele_acp.config import load_config
@@ -52,10 +56,10 @@ class ACPClient(acp.Client):
         raise
 
     async def terminal_output(self, session_id: str, terminal_id: str, **kwargs: Any) -> acp.TerminalOutputResponse:
-        raise
+        raise NotImplementedError("Terminal output not implemented")
 
     async def release_terminal(self, session_id: str, terminal_id: str, **kwargs: Any) -> acp.ReleaseTerminalResponse | None:
-        raise
+        raise NotImplementedError("Terminal release not implemented")
 
     async def wait_for_terminal_exit(self, session_id: str, terminal_id: str, **kwargs: Any) -> acp.WaitForTerminalExitResponse:
         raise NotImplementedError("Terminal wait for exit not implemented")
@@ -73,21 +77,71 @@ class ACPClient(acp.Client):
         raise NotImplementedError("External notification not implemented")
 
 
+class AgentConnection:
+    def __init__(self, peer: telethon.types.TypePeer) -> None:
+        self.peer = peer
+        loop = asyncio.get_running_loop()
+        self._task = loop.create_task(self._run())
+        self._buffer_lock = asyncio.Lock()
+        self._buffer: list[Message] = []
+        self.logger = logging.getLogger(__name__ + str(self.peer))
+        self.response_queue = asyncio.Queue[str]()
+
+    async def _run(self) -> None:
+        async with acp.spawn_agent_process(ACPClient(), "kimi", "acp") as (conn, proc):
+            _ = proc
+            await conn.initialize(
+                protocol_version=acp.PROTOCOL_VERSION,
+                client_capabilities=acp.ClientCapabilities(),
+                client_info=acp.Implementation(name="example-client", title="Example Client", version="0.1.0"),
+            )
+            session = await conn.new_session(cwd=os.getcwd())
+            session_id = session.session_id
+
+            while True:
+                async with self._buffer_lock:
+                    buffer = self._buffer
+                    self._buffer = []
+                self.logger.info(buffer)
+
+                # await conn.prompt(prompt=[acp.text_block("")], session_id=session_id)
+
+    async def _forward(self) -> None:
+        while True:
+            msg = await self.response_queue.get()
+            print("!!!!!!" + msg)
+
+    async def handle(self, message: Message):
+        async with self._buffer_lock:
+            self._buffer.append(message)
+
+
 async def mainloop(cli_args: SharedArgs) -> bool:
+    logger = logging.getLogger(__name__)
+
+    lock = asyncio.Lock()
+    conn_dict: dict[telethon.types.TypePeer, AgentConnection] = {}
+
+    async def on_message(event: events.NewMessage.Event):
+        _ = event
+        message: Message = event.message
+        logger.info(f"New message received {message}")
+
+        if not isinstance(message.peer_id, telethon.types.PeerUser):
+            return
+
+        async with lock:
+            conn = conn_dict.get(message.peer_id)
+            if not conn:
+                conn = AgentConnection(message.peer_id)
+                conn_dict[message.peer_id] = conn
+
+        await conn.handle(message)
+
     tg = await TGClient.create(session_name=cli_args.session, config=load_config(config_file=cli_args.config_file))
+    tg.add_event_handler(on_message, events.NewMessage())
+
     async with tg as tg:
         await tg.disconnected
-
-    proc = await asyncio.create_subprocess_exec(
-        "kimi acp",
-        stdin=aio_subprocess.PIPE,
-        stdout=aio_subprocess.PIPE,
-    )
-    conn = acp.connect_to_agent(ACPClient(), proc.stdin, proc.stdout)
-    await conn.initialize(
-        protocol_version=acp.PROTOCOL_VERSION,
-        client_capabilities=acp.ClientCapabilities(),
-        client_info=acp.Implementation(name="example-client", title="Example Client", version="0.1.0"),
-    )
 
     return True
