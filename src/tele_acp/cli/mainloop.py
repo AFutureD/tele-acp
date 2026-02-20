@@ -4,7 +4,7 @@ import os
 from typing import Any
 from tele_acp.telegram import TGClient
 
-from tele_acp.types import peer_hash_into_str
+from tele_acp.types import peer_hash_into_str, unreachable
 from telethon import events
 import telethon
 from telethon.custom import Message
@@ -17,14 +17,12 @@ from throttler import Throttler
 
 
 class ACPClient(acp.Client):
-    def __init__(self, response_queue: asyncio.Queue[str | None], logger: logging.Logger) -> None:
-        self._response_queue = response_queue
+    def __init__(self, outbound_queue: asyncio.Queue[str | None], logger: logging.Logger) -> None:
+        self._outbound_queue = outbound_queue
         self._logger = logger
 
-    async def request_permission(
-        self, options: list[schema.PermissionOption], session_id: str, tool_call: schema.ToolCallUpdate, **kwargs: Any
-    ) -> schema.RequestPermissionResponse:
-        raise NotImplementedError("Permission request not implemented")
+    def on_connect(self, conn: acp.Agent) -> None:
+        self._logger.info("Connected to ACP agent: %s", conn)
 
     async def session_update(
         self,
@@ -45,20 +43,42 @@ class ACPClient(acp.Client):
         self._logger.info("session_update")
         self._logger.info(update)
 
-        _ = session_id, kwargs
-        if not isinstance(update, schema.AgentMessageChunk):
-            return
-        if not isinstance(update.content, schema.TextContentBlock):
-            return
+        _ = kwargs
 
-        text = update.content.text
-        await self._response_queue.put(text)
+        match update:
+            case schema.UserMessageChunk():
+                await self.handle_user_message_chunk(session_id, update)
+            case schema.AgentMessageChunk():
+                await self.handle_agent_message_chunk(session_id, update)
+            case schema.AgentThoughtChunk():
+                await self.handle_agent_message_chunk(session_id, update)
+            case schema.ToolCallStart():
+                await self.handle_tool_call_start(session_id, update)
+            case schema.ToolCallProgress():
+                await self.handle_tool_call_progress(session_id, update)
+            case schema.AgentPlanUpdate():
+                await self.handle_agent_plan_update(session_id, update)
+            case schema.AvailableCommandsUpdate():
+                await self.handle_available_commands_update(session_id, update)
+            case schema.CurrentModeUpdate():
+                await self.handle_current_mode_update(session_id, update)
+            case schema.ConfigOptionUpdate():
+                await self.handle_config_option_update(session_id, update)
+            case schema.SessionInfoUpdate():
+                await self.handle_session_info_update(session_id, update)
+            case schema.UsageUpdate():
+                await self.handle_usage_update(session_id, update)
+
+    async def request_permission(
+        self, options: list[schema.PermissionOption], session_id: str, tool_call: schema.ToolCallUpdate, **kwargs: Any
+    ) -> schema.RequestPermissionResponse:
+        raise NotImplementedError("Permission request not implemented")
 
     async def write_text_file(self, content: str, path: str, session_id: str, **kwargs: Any) -> schema.WriteTextFileResponse | None:
-        raise NotImplementedError("Write text file not implemented")
+        unreachable("Write text file not implemented")
 
     async def read_text_file(self, path: str, session_id: str, limit: int | None = None, line: int | None = None, **kwargs: Any) -> schema.ReadTextFileResponse:
-        raise NotImplementedError("Read text file not implemented")
+        unreachable("Read text file not implemented")
 
     async def create_terminal(
         self,
@@ -70,28 +90,63 @@ class ACPClient(acp.Client):
         output_byte_limit: int | None = None,
         **kwargs: Any,
     ) -> schema.CreateTerminalResponse:
-        raise NotImplementedError("Create terminal not implemented")
+        unreachable("Create terminal not implemented")
 
     async def terminal_output(self, session_id: str, terminal_id: str, **kwargs: Any) -> schema.TerminalOutputResponse:
-        raise NotImplementedError("Terminal output not implemented")
+        unreachable("Terminal output not implemented")
 
     async def release_terminal(self, session_id: str, terminal_id: str, **kwargs: Any) -> schema.ReleaseTerminalResponse | None:
-        raise NotImplementedError("Terminal release not implemented")
+        unreachable("Terminal release not implemented")
 
     async def wait_for_terminal_exit(self, session_id: str, terminal_id: str, **kwargs: Any) -> schema.WaitForTerminalExitResponse:
-        raise NotImplementedError("Terminal wait for exit not implemented")
+        unreachable("Terminal wait for exit not implemented")
 
     async def kill_terminal(self, session_id: str, terminal_id: str, **kwargs: Any) -> schema.KillTerminalCommandResponse | None:
-        raise NotImplementedError("Terminal kill not implemented")
+        unreachable("Terminal kill not implemented")
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
-        raise NotImplementedError("External method not implemented")
+        unreachable("External method not implemented")
 
     async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
         raise NotImplementedError("External notification not implemented")
 
-    def on_connect(self, conn: acp.Agent) -> None:
-        self._logger.info("Connected to ACP agent: %s", conn)
+    async def handle_user_message_chunk(self, session_id: str, update: schema.UserMessageChunk) -> None:
+        _ = session_id, update
+
+    async def handle_agent_message_chunk(self, session_id: str, update: schema.AgentMessageChunk | schema.AgentThoughtChunk) -> None:
+        _ = session_id, update
+
+        if isinstance(update, schema.AgentMessageChunk):
+            match update.content:
+                case schema.TextContentBlock:
+                    text = update.content.text
+                    await self._outbound_queue.put(text)
+                case _:
+                    pass
+
+    async def handle_tool_call_start(self, session_id: str, update: schema.ToolCallStart) -> None:
+        _ = session_id, update
+
+    async def handle_tool_call_progress(self, session_id: str, update: schema.ToolCallProgress) -> None:
+        _ = session_id, update
+
+    async def handle_agent_plan_update(self, session_id: str, update: schema.AgentPlanUpdate) -> None:
+        _ = session_id, update
+
+    async def handle_available_commands_update(self, session_id: str, update: schema.AvailableCommandsUpdate) -> None:
+        _ = session_id, update
+
+    async def handle_current_mode_update(self, session_id: str, update: schema.CurrentModeUpdate) -> None:
+        _ = session_id, update
+
+    async def handle_config_option_update(self, session_id: str, update: schema.ConfigOptionUpdate) -> None:
+        _ = session_id, update
+
+    async def handle_session_info_update(self, session_id: str, update: schema.SessionInfoUpdate) -> None:
+        _ = session_id, update
+
+    async def handle_usage_update(self, session_id: str, update: schema.UsageUpdate) -> None:
+        _ = session_id, update
 
 
 class AgentConnection:
@@ -101,6 +156,8 @@ class AgentConnection:
         self._inbound_queue = asyncio.Queue[str]()
         self.logger = logging.getLogger(__name__ + str(self.peer))
         self.response_queue = asyncio.Queue[str | None]()
+
+        self.session: acp.schema.NewSessionResponse | None = None
 
         loop = asyncio.get_running_loop()
         self._inbound_task = loop.create_task(self._handle_inbound())
@@ -122,6 +179,7 @@ class AgentConnection:
                     client_info=schema.Implementation(name="tele-acp", title="tele-acp", version="2026.1.0"),
                 )
                 session = await conn.new_session(cwd=os.getcwd())
+                self.session = session
                 session_id = session.session_id
 
                 # IMPORTANT: inbound loop
