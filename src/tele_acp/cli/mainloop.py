@@ -13,6 +13,7 @@ from .types import SharedArgs
 from tele_acp.config import load_config
 import acp
 from acp import schema
+from throttler import Throttler
 
 
 class ACPClient(acp.Client):
@@ -142,6 +143,8 @@ class AgentConnection:
         sending_message: telethon.types.TypeMessage | None = None
         sending_content: str = ""  # we can't reuse sending_message as it will strip empty charactors.
 
+        throttler = Throttler(rate_limit=1, period=1)
+
         # IMPORTANT: outbound loop
         while True:
             msg = await self.response_queue.get()
@@ -152,20 +155,21 @@ class AgentConnection:
                 sending_content = ""
                 continue
 
+            if msg.strip() == "":
+                # telegram requirement. when edit message, content should not be the same.
+                continue
+
             sending_content += msg
 
-            try:
-                if sending_message:
-                    if sending_content.strip() == sending_message.message:
-                        # telegram requirement. when edit message, content should not be the same.
-                        continue
+            async with throttler:
+                try:
+                    if sending_message:
+                        sending_message = await self._tg.edit_message(self.peer, sending_message.id, sending_content)
+                    else:
+                        sending_message = await self._tg.send_message(self.peer, sending_content)
 
-                    sending_message = await self._tg.edit_message(self.peer, sending_message.id, sending_content)
-                else:
-                    sending_message = await self._tg.send_message(self.peer, sending_content)
-
-            except Exception:
-                self.logger.exception("Failed to forward ACP response to telegram")
+                except Exception:
+                    self.logger.exception("Failed to forward ACP response to telegram")
 
     async def handle(self, message: Message) -> None:
         text = (message.raw_text or "").strip()
