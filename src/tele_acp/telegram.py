@@ -1,14 +1,15 @@
-from pathlib import Path
+import inspect
 import sqlite3
+from pathlib import Path
 from typing import Callable
+
+import telethon
+from telethon.errors import RPCError
+from telethon.tl.functions.account import GetAuthorizationsRequest
+
 from tele_acp import types
 from tele_acp.session import TGSession, load_session, session_ensure_current_valid
 from tele_acp.utils.fmt import format_me
-import telethon
-import inspect
-
-from telethon.errors import RPCError
-from telethon.tl.functions.account import GetAuthorizationsRequest
 
 
 class TGClient(telethon.TelegramClient):

@@ -45,4 +45,5 @@ xie = "tele_acp.cli:cli"
 line-length = 160
 
 [tool.ruff.lint]
-fixable = ["F401"]
+fixable = ["ALL"]
+extend-select = ["I"]

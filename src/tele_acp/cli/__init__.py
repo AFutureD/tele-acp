@@ -4,16 +4,17 @@ import asyncio
 from pathlib import Path
 from typing import Annotated
 
+import typer
+
 from tele_acp.config import load_config
 from tele_acp.constant import VERSION
 from tele_acp.telegram import TGClient
 from tele_acp.types import Format
-from tele_acp.utils import print, fmt
+from tele_acp.utils import fmt, print
 
 from .auth import auth_cli
 from .mainloop import mainloop
 from .types import SharedArgs
-import typer
 
 cli = typer.Typer(
     epilog="Made by Huanan",

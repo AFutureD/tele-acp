@@ -1,6 +1,7 @@
-from typing import Literal
-import rich
 import builtins
+from typing import Literal
+
+import rich
 
 from tele_acp.types import Format
 
