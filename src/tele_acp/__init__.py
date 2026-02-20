@@ -8,6 +8,6 @@ import logging
 # fh.setLevel(logging.DEBUG)
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     handlers=[logging.StreamHandler(), logging.FileHandler("tele-acp.log")],
 )
