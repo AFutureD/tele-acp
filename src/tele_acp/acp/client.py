@@ -109,11 +109,18 @@ class ACPClient(acp.Client):
         _ = session_id, update
 
         if isinstance(update, schema.AgentMessageChunk):
-            match update.content:
-                case schema.TextContentBlock:
-                    text = update.content.text
-                    await self._outbound_queue.put(text)
-                case _:
+            content = update.content
+
+            match content:
+                case schema.TextContentBlock():
+                    await self._outbound_queue.put(content.text)
+                case schema.ImageContentBlock():
+                    pass
+                case schema.AudioContentBlock():
+                    pass
+                case schema.ResourceContentBlock():
+                    pass
+                case schema.EmbeddedResourceContentBlock():
                     pass
 
     async def handle_tool_call_start(self, session_id: str, update: schema.ToolCallStart) -> None:
