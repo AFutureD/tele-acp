@@ -64,7 +64,14 @@ class ACPClient(acp.Client):
     async def request_permission(
         self, options: list[schema.PermissionOption], session_id: str, tool_call: schema.ToolCallUpdate, **kwargs: Any
     ) -> schema.RequestPermissionResponse:
-        raise NotImplementedError("Permission request not implemented")
+        from acp.schema import AllowedOutcome
+
+        options = [o for o in options if o.kind == "allow_always" or o.kind == "allow_once"]
+
+        if len(options) <= 1:
+            unreachable("At least one option is required")
+
+        return schema.RequestPermissionResponse(outcome=AllowedOutcome(outcome="selected", option_id=options[0].option_id))
 
     async def write_text_file(self, content: str, path: str, session_id: str, **kwargs: Any) -> schema.WriteTextFileResponse | None:
         unreachable("Write text file not implemented")

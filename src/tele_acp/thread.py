@@ -4,13 +4,14 @@ import os
 
 import acp
 import telethon
+from acp.schema import HttpMcpServer
 
 from tele_acp.acp import ACPClient
 from tele_acp.telegram import TGClient
 from tele_acp.utils.throttle import Throttler
 
 
-class AgentConnection:
+class AgentThread:
     def __init__(self, peer: telethon.types.TypePeer, tg: TGClient) -> None:
         self.peer = peer
         self._tg = tg
@@ -26,7 +27,7 @@ class AgentConnection:
 
     async def _handle_inbound(self) -> None:
         try:
-            async with acp.spawn_agent_process(ACPClient(self.outbound_queue, self.logger), "/opt/homebrew/bin/codex-acp") as (conn, proc):
+            async with acp.spawn_agent_process(ACPClient(self.outbound_queue, self.logger), "/Users/huanan/.local/bin/kimi", "acp") as (conn, proc):
                 _ = proc
 
                 # DEBUG
@@ -34,14 +35,12 @@ class AgentConnection:
 
                 await conn.initialize(
                     protocol_version=acp.PROTOCOL_VERSION,
-                    client_capabilities=acp.schema.ClientCapabilities(
-                        fs=acp.schema.FileSystemCapability(read_text_file=False, write_text_file=False),
-                        terminal=False,
-                    ),
                     client_info=acp.schema.Implementation(name="tele-acp", title="tele-acp", version="2026.1.0"),
                 )
 
-                session = await conn.new_session(cwd=os.getcwd())
+                mcp = HttpMcpServer(name="Telegram ACP Interface", url="http://127.0.0.1:9998/mcp", headers=[], type="http")
+                session = await conn.new_session(cwd=os.getcwd(), mcp_servers=[mcp])
+
                 self.session = session
                 session_id = session.session_id
 
@@ -62,7 +61,7 @@ class AgentConnection:
     async def _handle_outbound(self) -> None:
 
         sending_message: telethon.types.TypeMessage | None = None
-        sending_content: str = ""  # we can't reuse sending_message as it will strip empty charactors.
+        sending_content: str = ""  # we can't reuse sending_message as it will strip empty characters.
 
         limiter = Throttler(rate_limit=1, period=1)
 
@@ -71,7 +70,7 @@ class AgentConnection:
             msg = await self.outbound_queue.get()
 
             if not msg:
-                # IMPORTANT: when received a none from queue it meams a prompt turn has end.
+                # IMPORTANT: when received a none from queue it means a prompt turn has end.
                 await limiter.flush()
                 sending_message = None
                 sending_content = ""
