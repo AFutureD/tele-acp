@@ -17,7 +17,7 @@ from tele_acp.utils.fmt import format_me
 
 class TGClient(telethon.TelegramClient):
     @staticmethod
-    async def create(session_name: str | None, config: types.Config, with_current: bool = True) -> TGClient:
+    def create(session_name: str | None, config: types.Config, with_current: bool = True) -> TGClient:
         session: TGSession = load_session(session_name, with_current=with_current)
 
         return TGClient(
@@ -126,7 +126,7 @@ class TGClient(telethon.TelegramClient):
         nosound_video: bool | None = None,
         send_as: hints.EntityLike | None = None,
         message_effect_id: int | None = None,
-    ) -> types.Message:
+    ) -> telethon.types.Message:
         """
         Send a message to a Telegram entity.
 
@@ -169,7 +169,7 @@ class TGClient(telethon.TelegramClient):
         if isinstance(entity, str) or isinstance(entity, int):
             entity = await _resolve_entity(entity)
 
-        return await super().send_message(
+        messages = await super().send_message(
             entity=entity,
             message=message,
             reply_to=reply_to,  # type: ignore[arg-type]
@@ -191,3 +191,10 @@ class TGClient(telethon.TelegramClient):
             send_as=send_as,
             message_effect_id=message_effect_id,
         )
+
+        if isinstance(messages, list):
+            ret = messages[0]  # TODO: support grouped message
+        else:
+            ret = messages
+
+        return ret

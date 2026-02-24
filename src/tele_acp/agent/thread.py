@@ -12,6 +12,8 @@ from tele_acp.utils.throttle import Throttler
 
 
 class AgentThread:
+    """ """
+
     def __init__(self, peer: telethon.types.TypePeer, tg: TGClient) -> None:
         self.peer = peer
         self._tg = tg
@@ -107,3 +109,6 @@ class AgentThread:
         if not text:
             return
         await self._inbound_queue.put(text)
+
+    async def run_until_finish(self):
+        pass

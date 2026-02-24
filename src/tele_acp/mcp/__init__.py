@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import cast
 
+from telethon import hints
+
 from mcp.server.fastmcp import Context, FastMCP
 
 from tele_acp.telegram import TGClient
@@ -43,7 +45,7 @@ async def send_message(
     ctx: Context,
     entity: str | int,
     message: str,
-    file: str | list[str] | None = None,
+    file: list[str] | None = None,
 ) -> str | None:
     """
     Send a message to a Telegram entity.
@@ -74,5 +76,10 @@ async def send_message(
 
     tg = cast(MCP, ctx.fastmcp).tg
 
-    msg = await tg.send_message(entity=entity, message=message, file=file)
-    return msg.to_json()
+    send_file = cast(hints.FileLike | list[hints.FileLike] | None, file)
+    msg = await tg.send_message(entity=entity, message=message, file=send_file)
+
+    try:
+        return msg.to_json()
+    except Exception as e:
+        return str(e)

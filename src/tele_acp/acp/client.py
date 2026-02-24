@@ -104,7 +104,7 @@ class ACPClient(acp.Client):
         unreachable("Terminal kill not implemented")
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
-        unreachable("External method not implemented")
+        raise NotImplementedError("External method not implemented")
 
     async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
         raise NotImplementedError("External notification not implemented")
