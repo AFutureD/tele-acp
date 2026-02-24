@@ -43,6 +43,7 @@ async def mainloop(cli_args: SharedArgs) -> bool:
 
     # start tg client
     async with tg as tg:
+        mcp_server.set_tg_client(tg)
 
         async def _wait_for_disconnect() -> None:
             await tg.disconnected

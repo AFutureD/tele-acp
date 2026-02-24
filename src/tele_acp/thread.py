@@ -79,7 +79,7 @@ class AgentThread:
             sending_content += msg
 
             if msg.strip() == "":
-                # telegram requirement. when edit message, content should not be the same.
+                # telegram requirement. when edit message, content should not be unchanged.
                 continue
 
             # main job: send message

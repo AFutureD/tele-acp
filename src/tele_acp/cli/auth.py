@@ -207,7 +207,7 @@ def auth_switch(
         if len(client_lists) > 1:
             raise typer.BadParameter("Multiple Sessions Matched")
 
-        session = client_lists[0].session
+        session = client_lists[0].get_session()
         if not session:
             return False
         session_switch(session=session)

@@ -45,6 +45,10 @@ xie = "tele_acp.cli:cli"
 [tool.ruff]
 line-length = 160
 
+[tool.ruff.format]
+docstring-code-format = true
+
 [tool.ruff.lint]
 fixable = ["ALL"]
 extend-select = ["I"]
+select = ["DOC","D"]

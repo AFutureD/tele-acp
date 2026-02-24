@@ -1,9 +1,12 @@
 import inspect
 import sqlite3
+import typing
 from pathlib import Path
+from sre_compile import SUBPATTERN
 from typing import Callable
 
 import telethon
+from telethon import hints
 from telethon.errors import RPCError
 from telethon.tl.functions.account import GetAuthorizationsRequest
 
@@ -35,6 +38,8 @@ class TGClient(telethon.TelegramClient):
         return await self._start_without_login()
 
     def get_session(self) -> TGSession | None:
+        if not isinstance(self.session, TGSession):
+            return None
         return self.session
 
     async def get_user(self) -> telethon.types.User | None:
@@ -96,4 +101,93 @@ class TGClient(telethon.TelegramClient):
             user_name=me.username,
             user_phone=me.phone,
             user_display_name=format_me(me),
+        )
+
+    async def send_message(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self,
+        entity: hints.EntityLike,
+        message: hints.MessageLike = "",
+        *,
+        reply_to: None | int | telethon.types.Message = None,
+        attributes: list[telethon.types.TypeDocumentAttribute] | None = None,
+        parse_mode: str | None = None,
+        formatting_entities: None | typing.List[telethon.types.TypeMessageEntity] = None,
+        link_preview: bool = True,
+        file: hints.FileLike | list[hints.FileLike] | None = None,
+        thumb: hints.FileLike | None = None,
+        force_document: bool = False,
+        clear_draft: bool = False,
+        buttons: hints.MarkupLike | None = None,
+        silent: bool | None = None,
+        background: bool | None = None,
+        supports_streaming: bool = False,
+        schedule: "hints.DateLike" = None,
+        comment_to: int | telethon.types.Message | None = None,
+        nosound_video: bool | None = None,
+        send_as: hints.EntityLike | None = None,
+        message_effect_id: int | None = None,
+    ) -> types.Message:
+        """
+        Send a message to a Telegram entity.
+
+        entity resolution:
+        - `int`: treated as a peer ID (see https://core.telegram.org/api/peers#peer-id).
+        - `str`: first try Telethon's resolver (username, phone, etc).
+          If that fails, fall back to scanning dialogs and picking the *unique* match by:
+          - dialog name contains `receiver` (case-insensitive), or
+          - dialog peer id equals `receiver`, or
+          - dialog entity id equals `receiver`.
+        """
+
+        async def _resolve_entity(target: str | int) -> hints.EntityLike:
+            # Fast path: let Telethon resolve usernames/phones/IDs without scanning dialogs.
+            try:
+                return await self.get_input_entity(target)
+            except Exception:
+                pass
+
+            # NOTICE: do not convert str to int by default.
+            #         the phone and the peer_id can not be determined.
+
+            # if input is int, it must be peer_id, and we do not need do any matching.
+            if isinstance(target, int):
+                return target
+
+            # Fallback: scan dialogs for a unique match (avoid building the full list).
+            target_norm = target.casefold()
+            async for dialog in self.iter_dialogs():
+                name = (dialog.name or "").casefold()
+                if target_norm and target_norm in name:
+                    return dialog.entity
+
+                if str(dialog.id) == target or str(dialog.entity.id) == target:
+                    return dialog.entity
+
+            # If no match found, return the original target
+            return target
+
+        if isinstance(entity, str) or isinstance(entity, int):
+            entity = await _resolve_entity(entity)
+
+        return await super().send_message(
+            entity=entity,
+            message=message,
+            reply_to=reply_to,  # type: ignore[arg-type]
+            attributes=attributes,  # type: ignore[arg-type]
+            parse_mode=parse_mode,
+            formatting_entities=formatting_entities,
+            link_preview=link_preview,
+            file=file,  # type: ignore[arg-type]
+            thumb=thumb,  # type: ignore[arg-type]
+            force_document=force_document,
+            clear_draft=clear_draft,
+            buttons=buttons,
+            silent=silent,  # type: ignore[arg-type]
+            background=background,  # type: ignore[arg-type]
+            supports_streaming=supports_streaming,
+            schedule=schedule,
+            comment_to=comment_to,  # type: ignore[arg-type]
+            nosound_video=nosound_video,  # type: ignore[arg-type]
+            send_as=send_as,
+            message_effect_id=message_effect_id,
         )
