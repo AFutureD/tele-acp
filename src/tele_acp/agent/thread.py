@@ -12,6 +12,22 @@ from tele_acp.utils.throttle import Throttler
 
 
 class AgentThread:
+    def __init__(self, dialog_id, agent: Agent, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[str]) -> None:
+        _ = dialog_id, agent, outbound_send
+        self.inbound_recv = inbound_recv
+
+    async def run_until_finish(self):
+        await self._handle_message()
+
+    async def _handle_message(self):
+        async with self.inbound_recv:
+            async for message in self.inbound_recv:
+                print("==========")
+                print(message)
+                print("==========")
+
+
+class AgentThread0:
     """ """
 
     def __init__(self, peer: telethon.types.TypePeer, tg: TGClient) -> None:
@@ -109,6 +125,3 @@ class AgentThread:
         if not text:
             return
         await self._inbound_queue.put(text)
-
-    async def run_until_finish(self):
-        pass

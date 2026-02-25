@@ -13,4 +13,4 @@ class ACPAgentConfig:
     id: str
     name: str
     acp_path: str
-    acp_args: [str]
+    acp_args: list[str]
