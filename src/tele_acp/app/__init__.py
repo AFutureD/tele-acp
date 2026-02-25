@@ -8,6 +8,7 @@ from anyio import BrokenResourceError, ClosedResourceError
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 
 from tele_acp.acp import ACPAgentConfig
+from tele_acp.utils.throttle import Throttler
 import telethon
 from telethon import events
 from telethon.custom import Message
@@ -22,7 +23,7 @@ from tele_acp.agent import Agent, AgentThread
 @dataclass
 class DialogContext:
     inbound_send: MemoryObjectSendStream[Message]
-    outbound_recv: MemoryObjectReceiveStream[str]
+    outbound_recv: MemoryObjectReceiveStream[str | None]
     outbound_consumer_task: asyncio.Task[None] | None
     lifecycle_task: asyncio.Task[None] | None
     last_activity_ts: float
@@ -93,7 +94,7 @@ class APP:
             loop = asyncio.get_running_loop()
 
             inbound_send, inbound_recv = anyio.create_memory_object_stream[Message](0)
-            outbound_send, outbound_recv = anyio.create_memory_object_stream[str](0)
+            outbound_send, outbound_recv = anyio.create_memory_object_stream[str | None](0)
 
             outbound_consumer_task = loop.create_task(self._consume_outbound(dialog_id, outbound_recv))
             lifecycle_task = loop.create_task(self._run_dialog_lifecycle(dialog_id, inbound_recv, outbound_send))
@@ -114,11 +115,17 @@ class APP:
 
     async def _consume_outbound(self, dialog_id: str, outbound_recv: MemoryObjectReceiveStream[str]) -> None:
         _ = dialog_id
+
         async with outbound_recv:
             async for message in outbound_recv:
+                print()
+                print(f"========= {dialog_id}")
                 print(message)
+                print()
 
-    async def _run_dialog_lifecycle(self, dialog_id: str, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[str]) -> None:
+    async def _run_dialog_lifecycle(
+        self, dialog_id: str, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[str | None]
+    ) -> None:
         try:
             agent = await self.get_agent_for_dialog(dialog_id)
             agent_thread = AgentThread(dialog_id, agent, inbound_recv, outbound_send)

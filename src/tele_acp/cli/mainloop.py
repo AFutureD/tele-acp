@@ -17,9 +17,6 @@ from .types import SharedArgs
 async def mainloop(cli_args: SharedArgs) -> bool:
     logger = logging.getLogger(__name__)
 
-    lock = asyncio.Lock()
-    conn_dict: dict[str, AgentThread] = {}
-
     config = load_config(config_file=cli_args.config_file)
     app = APP(config)
 

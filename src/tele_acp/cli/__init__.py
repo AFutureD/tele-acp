@@ -93,7 +93,7 @@ def me_get(ctx: typer.Context) -> None:
     cli_args: SharedArgs = ctx.obj
 
     async def _run() -> bool:
-        tg = await TGClient.create(session_name=cli_args.session, config=load_config(config_file=cli_args.config_file))
+        tg = TGClient.create(session_name=cli_args.session, config=load_config(config_file=cli_args.config_file))
 
         async with tg as tg:
             me = await tg.get_user()

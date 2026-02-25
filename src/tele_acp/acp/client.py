@@ -5,12 +5,13 @@ from typing import Any
 import acp
 from acp import schema
 
+from anyio.streams.memory import MemoryObjectSendStream
 from tele_acp.types import unreachable
 
 
 class ACPClient(acp.Client):
-    def __init__(self, outbound_queue: asyncio.Queue[str | None], logger: logging.Logger) -> None:
-        self._outbound_queue = outbound_queue
+    def __init__(self, outbound_send: MemoryObjectSendStream[str], logger: logging.Logger) -> None:
+        self._outbound_queue = outbound_send
         self._logger = logger
 
     def on_connect(self, conn: acp.Agent) -> None:
@@ -120,7 +121,7 @@ class ACPClient(acp.Client):
 
             match content:
                 case schema.TextContentBlock():
-                    await self._outbound_queue.put(content.text)
+                    await self._outbound_queue.send(content.text)
                 case schema.ImageContentBlock():
                     pass
                 case schema.AudioContentBlock():
