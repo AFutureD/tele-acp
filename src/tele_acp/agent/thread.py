@@ -1,68 +1,128 @@
-import asyncio
+from __future__ import annotations
+
 import logging
-import os
+from contextlib import AsyncExitStack, asynccontextmanager
+from pathlib import Path
 
-import acp
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
-
-import telethon
 from acp.schema import HttpMcpServer
-
-from tele_acp.acp import ACPClient
-from tele_acp.telegram import TGClient
-from tele_acp.utils.throttle import Throttler
+from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from telethon.custom import Message
 
-from .agent import Agent, ACPAgentConfig
+from tele_acp.acp import ACPAgentConfig
+
+from .agent import ACPAgentRuntime
 
 
 class AgentThread:
     def __init__(
-        self, dialog_id, agent_config: ACPAgentConfig, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[str | None]
+        self,
+        dialog_id: str,
+        agent_config: ACPAgentConfig,
+        inbound_recv: MemoryObjectReceiveStream[Message],
+        outbound_send: MemoryObjectSendStream[str | None],
     ) -> None:
         self.dialog_id = dialog_id
-        self.agent_config = agent_config
         self.inbound_recv = inbound_recv
         self.outbound_send = outbound_send
-        self.logger = logging.getLogger(__name__ + ":" + dialog_id)
-        self.session: acp.schema.NewSessionResponse | None = None
+        self.logger = logging.getLogger(f"{__name__}:{dialog_id}")
 
-        self.agent = Agent(agent_config)
+        mcp_server = HttpMcpServer(name="Telegram ACP Interface", url="http://127.0.0.1:9998/mcp", headers=[], type="http")
+        self._runtime = ACPAgentRuntime(
+            agent_config=agent_config,
+            outbound_send=outbound_send,
+            logger=self.logger,
+            cwd=Path.cwd(),
+            mcp_servers=[mcp_server],
+        )
 
-    async def run_until_finish(self):
-        async with self.outbound_send, self.inbound_recv:
-            try:
-                acp_command = self.agent.acp_agent_config.acp_path
-                acp_args = self.agent.acp_agent_config.acp_args
-                async with acp.spawn_agent_process(ACPClient(self.outbound_send, self.logger), acp_command, *acp_args) as (conn, proc):
-                    _ = proc
+    async def run_until_finish(self) -> None:
+        async with AsyncExitStack() as ts:
+            await ts.enter_async_context(self.outbound_send)
+            await ts.enter_async_context(self.inbound_recv)
+            await ts.enter_async_context(self._runtime)
 
-                    # DEBUG
-                    conn._conn.add_observer(lambda x: self.logger.debug(f"RAW JSONC: {x}"))
+            async for message in self.inbound_recv:
+                content = message.message
+                if not content:
+                    continue
 
-                    await conn.initialize(
-                        protocol_version=acp.PROTOCOL_VERSION,
-                        client_info=acp.schema.Implementation(name="tele-acp", title="tele-acp", version="2026.1.0"),
-                    )
+                self.logger.info("Dialog %s received: %s", self.dialog_id, content)
 
-                    mcp = HttpMcpServer(name="Telegram ACP Interface", url="http://127.0.0.1:9998/mcp", headers=[], type="http")
-                    session = await conn.new_session(cwd=os.getcwd(), mcp_servers=[mcp])
+                async with self.in_turn():
+                    await self._forward_to_acp(content)
 
-                    self.session = session
-                    session_id = session.session_id
+    async def command_help(self) -> None:
+        await self._send_system_message(
+            "\n".join(
+                [
+                    "Commands:",
+                    "/help",
+                    "/agent list",
+                    "/agent current",
+                    "/agent use <id>",
+                    "/session list",
+                    "/session current",
+                    "/session new [name]",
+                    "/session use <name>",
+                    "/session reset",
+                    "/reset",
+                ]
+            )
+        )
 
-                    async for message in self.inbound_recv:
-                        content = message.message
-                        if not content:
-                            continue
-                        self.logger.info(f"Agent receive {content}")
+    async def command_error(self, message: str) -> None:
+        pass
 
-                        try:
-                            await conn.prompt(prompt=[acp.text_block(content)], session_id=session_id)
-                        except Exception:
-                            self.logger.exception("Failed to prompt ACP agent")
-                        finally:
-                            # Indicate a prompt turn has end.
-                            await self.outbound_send.send(None)
-            except Exception:
-                self.logger.error("Failed to spawn_agent_process ACP agent")
+    async def command_unknown(self, name: str) -> None:
+        pass
+
+    async def command_agent_list(self) -> None:
+        pass
+
+    async def command_agent_current(self) -> None:
+        pass
+
+    async def command_agent_use(self, agent_id: str) -> None:
+        pass
+
+    async def command_session_list(self) -> None:
+        pass
+
+    async def command_session_current(self) -> None:
+        pass
+
+    async def command_session_new(self, session_id: str | None) -> None:
+        pass
+
+    async def command_session_use(self, session_id: str) -> None:
+        pass
+
+    async def command_session_reset(self) -> None:
+        pass
+
+    async def _forward_to_acp(self, content: str) -> None:
+        try:
+            await self._runtime.prompt(content=content)
+            return
+        except Exception:
+            self.logger.exception("Prompt failed for dialog %s, retrying once", self.dialog_id)
+
+        await self._runtime.restart(self._runtime.agent_config)
+        await self._runtime.prompt(content=content)
+
+    async def _send_system_message(self, message: str) -> None:
+        await self.outbound_send.send(message)
+
+    @asynccontextmanager
+    async def in_turn(self):
+        await self._start_turn()
+        try:
+            yield
+        finally:
+            await self._finish_turn()
+
+    async def _start_turn(self) -> None:
+        pass
+
+    async def _finish_turn(self) -> None:
+        await self.outbound_send.send(None)

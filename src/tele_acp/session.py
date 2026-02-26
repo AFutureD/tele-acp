@@ -39,14 +39,12 @@ def load_session(session_name: str | None, with_current: bool = True) -> TGSessi
 
 
 def session_ensure_current_valid(session: object = None) -> None:
-    """
-    check if current session path is symlink, throw error if not.
+    """Check if current session path is symlink, throw error if not.
     check if current session is point to a valid session path, and remove if not valid.
     create a current session path if it does not exist and point to given session path.
 
     notice: this function will not switch to the give session if current session has pointed to a valid session.
     """
-
     path = get_app_session_current()
     if path.exists() and not path.is_symlink():
         raise CurrentSessionPathNotValidError()

@@ -5,10 +5,10 @@ import telethon
 from telethon import events
 from telethon.custom import Message
 
+from tele_acp.app import APP, AgentThread
 from tele_acp.config import load_config
 from tele_acp.mcp import mcp_server
 from tele_acp.telegram import TGClient
-from tele_acp.app import APP, AgentThread
 from tele_acp.types import peer_hash_into_str
 
 from .types import SharedArgs

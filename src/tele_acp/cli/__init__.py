@@ -86,10 +86,7 @@ def main(
 
 @cli.command(name="me")
 def me_get(ctx: typer.Context) -> None:
-    """
-    Show the current authenticated Telegram account.
-    """
-
+    """Show the current authenticated Telegram account."""
     cli_args: SharedArgs = ctx.obj
 
     async def _run() -> bool:

@@ -5,7 +5,6 @@ from typing import Never
 
 def unreachable(message: str) -> Never:
     """Raise an AssertionError with the given message."""
-
     raise AssertionError(f"Expected code to be unreachable. {message}")
 
 

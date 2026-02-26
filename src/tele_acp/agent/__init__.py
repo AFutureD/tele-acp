@@ -1,5 +1,4 @@
+from .agent import ACPAgentRuntime
 from .thread import AgentThread
-from .agent import Agent
 
-
-__all__ = ["AgentThread", "Agent"]
+__all__ = ["AgentThread", "ACPAgentRuntime"]

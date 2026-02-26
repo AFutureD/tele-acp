@@ -1,23 +1,20 @@
 import asyncio
+import logging
 from contextlib import suppress
 from dataclasses import dataclass
-import logging
 
 import anyio
-from anyio import BrokenResourceError, ClosedResourceError
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
-
-from tele_acp.acp import ACPAgentConfig
-from tele_acp.utils.throttle import Throttler
 import telethon
+from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from telethon import events
 from telethon.custom import Message
 
+from tele_acp.acp import ACPAgentConfig
+from tele_acp.agent import AgentThread
 from tele_acp.mcp import MCP
 from tele_acp.telegram import TGClient
 from tele_acp.types import peer_hash_into_str
 from tele_acp.types.config import Config
-from tele_acp.agent import Agent, AgentThread
 
 
 @dataclass
@@ -46,6 +43,9 @@ class APP:
         self._config = config
         self._tele_client = tele_client
         self._mcp_server: MCP = mcp_server
+        self._agents: list[ACPAgentConfig] = [
+            ACPAgentConfig(id="kimi", name="Kimi CLI", acp_path="kimi", acp_args=["acp"]),
+        ]
 
         self._dialog_dict_lock = asyncio.Lock()
         self._dialog_ctx: dict[str, DialogContext] = {}
@@ -109,26 +109,55 @@ class APP:
             self._dialog_ctx[dialog_id] = ctx
             return ctx
 
+    def list_agents(self) -> list[ACPAgentConfig]:
+        return [*self._agents]
+
+    def get_agent_by_id(self, agent_id: str) -> ACPAgentConfig | None:
+        for item in self._agents:
+            if item.id == agent_id:
+                return item
+        return None
+
     async def get_agent_for_dialog(self, dialog_id: str) -> ACPAgentConfig:
         _ = dialog_id
-        return ACPAgentConfig(id="kimi", name="Kimi CLI", acp_path="kimi", acp_args=["acp"])
+        return self._agents[0]
 
-    async def _consume_outbound(self, dialog_id: str, outbound_recv: MemoryObjectReceiveStream[str]) -> None:
-        _ = dialog_id
+    async def _consume_outbound(self, dialog_id: str, outbound_recv: MemoryObjectReceiveStream[str | None]) -> None:
+        pending_chunks: list[str] = []
 
         async with outbound_recv:
             async for message in outbound_recv:
-                print()
-                print(f"========= {dialog_id}")
-                print(message)
-                print()
+                if message is None:
+                    if not pending_chunks:
+                        continue
+                    text = "".join(pending_chunks)
+                    pending_chunks.clear()
+                    print()
+                    print(f"========= {dialog_id}")
+                    print(text)
+                    print()
+                    continue
+
+                pending_chunks.append(message)
+
+        if pending_chunks:
+            print()
+            print(f"========= {dialog_id}")
+            print("".join(pending_chunks))
+            print()
 
     async def _run_dialog_lifecycle(
         self, dialog_id: str, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[str | None]
     ) -> None:
         try:
             agent_config = await self.get_agent_for_dialog(dialog_id)
-            agent_thread = AgentThread(dialog_id, agent_config, inbound_recv, outbound_send)
+            agent_thread = AgentThread(
+                dialog_id=dialog_id,
+                agent_config=agent_config,
+                # agent_registry=self.list_agents(),
+                inbound_recv=inbound_recv,
+                outbound_send=outbound_send,
+            )
             await agent_thread.run_until_finish()
         except asyncio.CancelledError:
             raise

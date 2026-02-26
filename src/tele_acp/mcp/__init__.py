@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import cast
 
-from telethon import hints
-
 from mcp.server.fastmcp import Context, FastMCP
+from telethon import hints
 
 from tele_acp.telegram import TGClient
 
@@ -47,8 +46,7 @@ async def send_message(
     message: str,
     file: list[str] | None = None,
 ) -> str | None:
-    """
-    Send a message to a Telegram entity.
+    """Send a message to a Telegram entity.
 
     Args:
         entity:
@@ -72,8 +70,8 @@ async def send_message(
 
     Return:
         The sent message if succeed.
-    """
 
+    """
     tg = cast(MCP, ctx.fastmcp).tg
 
     send_file = cast(hints.FileLike | list[hints.FileLike] | None, file)

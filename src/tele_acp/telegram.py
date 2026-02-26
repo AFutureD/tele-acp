@@ -32,9 +32,7 @@ class TGClient(telethon.TelegramClient):
         return self
 
     async def __aenter__(self):
-        """
-        override super `__aenter__` to avoid login process.
-        """
+        """Override super `__aenter__` to avoid login process."""
         return await self._start_without_login()
 
     def get_session(self) -> TGSession | None:
@@ -127,8 +125,7 @@ class TGClient(telethon.TelegramClient):
         send_as: hints.EntityLike | None = None,
         message_effect_id: int | None = None,
     ) -> telethon.types.Message:
-        """
-        Send a message to a Telegram entity.
+        """Send a message to a Telegram entity.
 
         entity resolution:
         - `int`: treated as a peer ID (see https://core.telegram.org/api/peers#peer-id).
