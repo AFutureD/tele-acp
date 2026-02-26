@@ -109,9 +109,9 @@ class APP:
             self._dialog_ctx[dialog_id] = ctx
             return ctx
 
-    async def get_agent_for_dialog(self, dialog_id: str) -> Agent:
+    async def get_agent_for_dialog(self, dialog_id: str) -> ACPAgentConfig:
         _ = dialog_id
-        return Agent(ACPAgentConfig(id="kimi", name="Kimi CLI", acp_path="kimi", acp_args=["acp"]))
+        return ACPAgentConfig(id="kimi", name="Kimi CLI", acp_path="kimi", acp_args=["acp"])
 
     async def _consume_outbound(self, dialog_id: str, outbound_recv: MemoryObjectReceiveStream[str]) -> None:
         _ = dialog_id
@@ -127,8 +127,8 @@ class APP:
         self, dialog_id: str, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[str | None]
     ) -> None:
         try:
-            agent = await self.get_agent_for_dialog(dialog_id)
-            agent_thread = AgentThread(dialog_id, agent, inbound_recv, outbound_send)
+            agent_config = await self.get_agent_for_dialog(dialog_id)
+            agent_thread = AgentThread(dialog_id, agent_config, inbound_recv, outbound_send)
             await agent_thread.run_until_finish()
         except asyncio.CancelledError:
             raise
