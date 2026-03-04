@@ -6,28 +6,48 @@ from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from pathlib import Path
 
 import anyio
+import telethon
 from acp.schema import HttpMcpServer
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from telethon.custom import Message
 
 from tele_acp.acp import ACPAgentConfig
-from tele_acp.types import AcpMessageChunk, OutBoundMessage
+from tele_acp.shared import get_app_user_defualt_dir
+from tele_acp.types import AcpMessageChunk, OutBoundMessage, peer_hash_into_str
 from tele_acp.types.acp import AcpMessage
+from tele_acp.types.agent import AgentConfig
 
 from .agent import ACPAgentRuntime
+
+
+def _get_agent_work_folder():
+    ret = get_app_user_defualt_dir() / "workspace"
+    ret.mkdir(parents=True, exist_ok=True)
+    return ret
+
+
+def get_agent_work_dir(id: str) -> Path:
+    agent_dir = _get_agent_work_folder() / id
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    return agent_dir
 
 
 class AgentThread:
     def __init__(
         self,
         dialog_id: str,
-        agent_config: ACPAgentConfig,
+        peer: telethon.types.TypePeer,
+        agent_config: AgentConfig,
+        acp_config: ACPAgentConfig,
         inbound_recv: MemoryObjectReceiveStream[Message],
         outbound_send: MemoryObjectSendStream[OutBoundMessage],
     ) -> None:
+        self.agent_config = agent_config
+        self.peer = peer
         self.dialog_id = dialog_id
         self.inbound_recv = inbound_recv
         self.outbound_send = outbound_send
+
         self.logger = logging.getLogger(f"{__name__}:{dialog_id}")
 
         inner_outbound_writer, inner_outbound = anyio.create_memory_object_stream[AcpMessageChunk](0)
@@ -38,12 +58,21 @@ class AgentThread:
 
         mcp_server = HttpMcpServer(name="telegram_mcp_server", url="http://127.0.0.1:9998/mcp", headers=[], type="http")
         self._runtime = ACPAgentRuntime(
-            agent_config=agent_config,
+            agent_config=acp_config,
             outbound_send=inner_outbound_writer,
             logger=self.logger,
-            cwd=Path.cwd(),
+            cwd=self.work_dir(),
             mcp_servers=[mcp_server],
         )
+
+    def work_dir(self) -> Path:
+        acp_cwd = self.agent_config.work_dir
+        if acp_cwd:
+            path = Path(acp_cwd)
+            if path.exists():
+                return path
+
+        return get_agent_work_dir(self.agent_config.id)
 
     async def run_until_finish(self) -> None:
         async with AsyncExitStack() as ts:
@@ -65,7 +94,15 @@ class AgentThread:
                             self.logger.warning("Message state is not initialized for dialog %s", self.dialog_id)
                             continue
                         self.message.prompt = content
-                    await self._forward_to_acp(content)
+                    prompt = f"""
+                    This is a message from Telegram.
+                    Dialog ID: {self.dialog_id}
+                    Peer ID: {self.peer.to_json()}
+
+                    User Content:
+                    {content}
+                    """
+                    await self._forward_to_acp(prompt)
 
     async def _run_acp_message_handler(self) -> None:
         async with self._inner_outbound:

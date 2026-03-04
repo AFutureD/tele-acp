@@ -15,6 +15,7 @@ from tele_acp.mcp import MCP
 from tele_acp.telegram import TGClient
 from tele_acp.types import OutBoundMessage, peer_hash_into_str
 from tele_acp.types.acp import AcpMessage
+from tele_acp.types.agent import AgentConfig
 from tele_acp.types.config import Config
 from tele_acp.utils.throttle import Throttler
 
@@ -101,7 +102,7 @@ class APP:
             outbound_send, outbound_recv = anyio.create_memory_object_stream[OutBoundMessage](0)
 
             outbound_consumer_task = loop.create_task(self._consume_outbound(peer, outbound_recv))
-            lifecycle_task = loop.create_task(self._run_dialog_lifecycle(dialog_id, inbound_recv, outbound_send))
+            lifecycle_task = loop.create_task(self._run_dialog_lifecycle(peer, inbound_recv, outbound_send))
 
             ctx = DialogContext(
                 inbound_send=inbound_send,
@@ -122,9 +123,13 @@ class APP:
                 return item
         return None
 
-    async def get_agent_for_dialog(self, dialog_id: str) -> ACPAgentConfig:
+    async def get_acp_for_dialog(self, dialog_id: str) -> ACPAgentConfig:
         _ = dialog_id
         return self._agents[0]
+
+    async def get_agent_config_for_dialog(self, dialog_id: str) -> AgentConfig:
+        _ = dialog_id
+        return self._config.agents[0]
 
     async def _consume_outbound(self, peer: telethon.types.TypePeer, outbound_recv: MemoryObjectReceiveStream[OutBoundMessage]) -> None:
         dialog_id = peer_hash_into_str(peer)
@@ -140,13 +145,18 @@ class APP:
                             await self._tele_client.send_message(peer, text)
 
     async def _run_dialog_lifecycle(
-        self, dialog_id: str, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[OutBoundMessage]
+        self, peer: telethon.types.TypePeer, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[OutBoundMessage]
     ) -> None:
+        dialog_id = peer_hash_into_str(peer)
+
         try:
-            agent_config = await self.get_agent_for_dialog(dialog_id)
+            acp_config = await self.get_acp_for_dialog(dialog_id)
+            agent_config = await self.get_agent_config_for_dialog(dialog_id)
             agent_thread = AgentThread(
                 dialog_id=dialog_id,
+                peer=peer,
                 agent_config=agent_config,
+                acp_config=acp_config,
                 inbound_recv=inbound_recv,
                 outbound_send=outbound_send,
             )
