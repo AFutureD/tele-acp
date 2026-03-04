@@ -80,27 +80,28 @@ class TGClient(telethon.TelegramClient):
     async def get_session_info(self) -> types.SessionInfo | None:
         try:
             me = await self.get_user()
+
+            if not me:
+                return None
+
+            session = self.session
+
+            if not isinstance(session, TGSession):
+                return None
+
+            session_path = Path(session.filename)
+
+            return types.SessionInfo(
+                path=session_path,
+                session_name=session_path.stem,
+                user_id=me.id,
+                user_name=me.username,
+                user_phone=me.phone,
+                user_display_name=format_me(me),
+            )
         except sqlite3.OperationalError as exc:
             if "locked" in str(exc).casefold():
                 return None
-
-        if not me:
-            return None
-        session = self.session
-
-        if not isinstance(session, TGSession):
-            return None
-
-        session_path = Path(session.filename)
-
-        return types.SessionInfo(
-            path=session_path,
-            session_name=session_path.stem,
-            user_id=me.id,
-            user_name=me.username,
-            user_phone=me.phone,
-            user_display_name=format_me(me),
-        )
 
     async def send_message(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
