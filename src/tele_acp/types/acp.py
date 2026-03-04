@@ -1,6 +1,7 @@
 from typing import TypeAlias
 
 import acp
+from acp.schema import AudioContentBlock, EmbeddedResourceContentBlock, ImageContentBlock, ResourceContentBlock, TextContentBlock
 from pydantic import BaseModel
 
 AcpMessageChunk: TypeAlias = (
@@ -37,28 +38,81 @@ class AcpMessage(BaseModel):
                 return chunk.kind
             return chunk.tool_call_id
 
-        parts: list[str] = []
+        PARTITION_KEY = {acp.schema.AgentThoughtChunk: "THNIK", acp.schema.AgentMessageChunk: "MESSAGE", acp.schema.ToolCallProgress: "TOOL"}
+
+        parts_list: list[tuple[str, list[acp.schema.AgentThoughtChunk] | list[acp.schema.AgentMessageChunk] | acp.schema.ToolCallProgress]] = []
 
         for chunk in self.chunks:
-            match chunk:
-                case acp.schema.AgentThoughtChunk():
-                    text = content_text(chunk.content)
-                    parts.append(text)
-                    # if text:
-                    #     parts.append(quote(text))
-                case acp.schema.ToolCallStart():
-                    parts.append(f"\n- [ ] {tool_label(chunk)}\n")
-                case acp.schema.ToolCallProgress():
-                    if chunk.status in {"completed", "failed"}:
-                        label = tool_label(chunk)
-                        if chunk.status == "failed":
-                            label = f"{label} (failed)"
-                        parts.append(f"\n- [x] {label}\n")
-                case acp.schema.AgentMessageChunk():
-                    text = content_text(chunk.content)
-                    if text:
-                        parts.append(text)
-                case _:
-                    continue
+            chunk_type = type(chunk)
+            partition_key = PARTITION_KEY.get(chunk_type)
+            if partition_key is None:
+                continue
 
-        return "".join(parts)
+            if partition_key == "TOOL":
+                parts_list.append((partition_key, chunk))  # type: ignore
+                continue
+
+            if len(parts_list) == 0:
+                tmp_key, temp_part = (None, [])
+            else:
+                tmp_key, temp_part = parts_list.pop()
+
+            if temp_part is None or tmp_key != partition_key:
+                temp_part = []
+                tmp_key = partition_key
+
+            if tmp_key == partition_key:
+                temp_part.append(chunk)  # type: ignore
+                parts_list.append((partition_key, temp_part))  # type: ignore
+            else:
+                parts_list.append((partition_key, temp_part))  # type: ignore
+                tmp_parts_list.append((partition_key, [chunk]))  # type: ignore
+
+        description: str = ""
+
+        def _description_think(chunk: acp.schema.AgentThoughtChunk) -> str:
+            content = chunk.content
+            if isinstance(content, TextContentBlock):
+                return content.text
+            if isinstance(content, ImageContentBlock):
+                return "ImageContentBlock"
+            if isinstance(content, AudioContentBlock):
+                return "AudioContentBlock"
+            if isinstance(content, ResourceContentBlock):
+                return "ResourceContentBlock"
+            if isinstance(content, EmbeddedResourceContentBlock):
+                return "EmbeddedResourceContentBlock"
+            return ""
+
+        def _description_message(chunk: acp.schema.AgentMessageChunk) -> str:
+            content = chunk.content
+            if isinstance(content, TextContentBlock):
+                return content.text
+            if isinstance(content, ImageContentBlock):
+                return "ImageContentBlock"
+            if isinstance(content, AudioContentBlock):
+                return "AudioContentBlock"
+            if isinstance(content, ResourceContentBlock):
+                return "ResourceContentBlock"
+            if isinstance(content, EmbeddedResourceContentBlock):
+                return "EmbeddedResourceContentBlock"
+            return ""
+
+        def _description_tool(chunk: acp.schema.ToolCallProgress) -> str:
+            if not chunk.status or chunk.status not in ["completed", "failed"]:
+                return ""
+            return f"> [{chunk.status}] {chunk.kind} {chunk.title} "
+
+        for partition_key, temp_part in parts_list:
+            if partition_key == "THNIK":
+                description += "".join([_description_think(chunk) for chunk in temp_part])  # type: ignore
+            elif partition_key == "MESSAGE":
+                description += "".join([_description_message(chunk) for chunk in temp_part])  # type: ignore
+            elif partition_key == "TOOL":
+                content = _description_tool(temp_part)  # type: ignore
+                if content != "":
+                    description += "\n"
+                    description += content  # type: ignore
+                    description += "\n"
+
+        return description
