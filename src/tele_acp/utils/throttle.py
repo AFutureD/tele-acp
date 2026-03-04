@@ -30,8 +30,8 @@ class Throttler:
         self._interval = self._period / self._rate_limit
 
         #
-        self._next_task_block_lock = asyncio.Lock()
-        self._next_task_block: TaskBlock | None = None
+        self._task_lock = asyncio.Lock()
+        self._task: TaskBlock | None = None
 
         #
         self._last_run_task_time: float | None = None
@@ -41,8 +41,8 @@ class Throttler:
         loop = asyncio.get_running_loop()
         now = loop.time()
 
-        async with self._next_task_block_lock:
-            self._next_task_block = task_block
+        async with self._task_lock:
+            self._task = task_block
 
         if self._next_handle:
             return
@@ -56,19 +56,18 @@ class Throttler:
         self._next_handle = loop.call_later(next_interval, self._run_task)
 
     async def flush(self) -> None:
-        if not self._next_handle:
-            return
+        if self._next_handle:
+            self._next_handle.cancel()
 
-        self._next_handle.cancel()
         await self._run_task_async()
 
     def _run_task(self) -> None:
         asyncio.create_task(self._run_task_async())
 
     async def _run_task_async(self) -> None:
-        async with self._next_task_block_lock:
-            task_block = self._next_task_block
-            self._next_task_block = None
+        async with self._task_lock:
+            task_block = self._task
+            self._task = None
 
         try:
             if task_block:

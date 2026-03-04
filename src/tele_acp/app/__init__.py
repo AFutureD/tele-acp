@@ -46,6 +46,7 @@ class APP:
         self._tele_client = tele_client
         self._mcp_server: MCP = mcp_server
         self._agents: list[ACPAgentConfig] = [
+            ACPAgentConfig(id="codex", name="Codex", acp_path="codex-acp", acp_args=[]),
             ACPAgentConfig(id="kimi", name="Kimi CLI", acp_path="kimi", acp_args=["acp"]),
         ]
 
@@ -147,10 +148,15 @@ class APP:
                                 await self._tele_client.edit_message(peer, sending.id, text)
                             else:
                                 sending = await self._tele_client.send_message(peer, text)
+
                             if not message.in_turn:
                                 sending = None
 
                 await limiter.call(_sending)
+
+                if isinstance(message, AcpMessage):
+                    if not message.in_turn:
+                        await limiter.flush()
 
     async def _run_dialog_lifecycle(
         self, dialog_id: str, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[OutBoundMessage]
