@@ -1,4 +1,7 @@
+import asyncio
 import inspect
+import logging
+import pathlib
 import sqlite3
 import typing
 from datetime import datetime
@@ -6,10 +9,12 @@ from pathlib import Path
 from typing import Callable
 
 import telethon
-from telethon import hints
+from telethon import functions, hints
 from telethon.errors import RPCError
 from telethon.tl.custom import Message
 from telethon.tl.functions.account import GetAuthorizationsRequest
+from telethon.tl.types.contacts import Contacts
+from telethon.types import PeerUser
 
 from tele_acp import types
 from tele_acp.session import TGSession, load_session, session_ensure_current_valid
@@ -26,6 +31,12 @@ class TGClient(telethon.TelegramClient):
             api_id=config.api_id,
             api_hash=config.api_hash,
         )
+
+    def __init__(self: "TGClient", session: TGSession, api_id: int, api_hash: str, **kwargs):
+        super().__init__(session, api_id, api_hash, **kwargs)
+
+        self.contacts_users_peer_last_update_date = 0
+        self.contacts_users_peer: list[PeerUser] = []
 
     async def _start_without_login(self) -> "TGClient":
         if not self.is_connected():
@@ -245,3 +256,18 @@ class TGClient(telethon.TelegramClient):
             )
         ]
         return messages
+
+    async def get_contacts(self) -> Contacts:
+        contacts: Contacts = await self(functions.contacts.GetContactsRequest(0))  # type: ignore
+        return contacts
+
+    async def get_contact_user_peer(self) -> list[PeerUser]:
+        now = asyncio.get_event_loop().time()
+        if now - self.contacts_users_peer_last_update_date < 60 * 10:
+            return self.contacts_users_peer
+
+        contacts = await self.get_contacts()
+        self.contacts_users_peer = [PeerUser(user.id) for user in contacts.users if isinstance(user, telethon.types.User)]
+        self.contacts_users_peer_last_update_date = now
+
+        return self.contacts_users_peer

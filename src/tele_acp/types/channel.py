@@ -15,15 +15,12 @@ class Channel(BaseModel):
 
 class TelegramChannel(Channel):
     id: str = "default"
+    allow_contacts: bool = Field(default=True, description="Whether to allow contacts")
+    whitelist: list[str] | None = Field(default=[], description="The list of allowed users. peer id or group id")
 
 
 class TelegramBotChannel(Channel):
     token: str = Field(description="Telegram bot token")
-
-
-class ChatDialog(BaseModel):
-    id: str = "default"
-    channel: Channel = TelegramChannel()
 
 
 class DialogBind(BaseModel):

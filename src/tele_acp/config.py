@@ -22,7 +22,8 @@ def save_config(config: Config, config_file: Path):
     config_file.parent.mkdir(parents=True, exist_ok=True)
 
     with open(config_file, "w", encoding="utf-8") as f:
-        tomlkit.dump(config.model_dump(mode="json"), f)
+        # TOML has no null type; omit None-valued optional fields.
+        tomlkit.dump(config.model_dump(mode="json", exclude_none=True), f)
 
 
 def load_config(config_file: Path | None = None) -> Config:
