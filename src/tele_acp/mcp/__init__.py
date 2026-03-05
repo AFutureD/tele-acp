@@ -12,13 +12,6 @@ from telethon import hints
 from tele_acp.telegram import TGClient
 
 
-class InnerVerifier(TokenVerifier):
-    async def verify_token(self, token: str) -> AccessToken | None:
-        import uuid
-
-        return AccessToken(token=token, client_id=str(uuid.uuid7()), scopes=[])
-
-
 class MCP(FastMCP):
     def __init__(self):
         super().__init__(name="telegram_mcp_server", json_response=True, port=9998)
@@ -61,14 +54,15 @@ async def send_message(
 
     Args:
         entity:
-            The entity id.
+            `peer id` or `username` or `phone`
 
-            - `int`: treated as a peer ID (see https://core.telegram.org/api/peers#peer-id).
+            - `int`: treated as a `peer id` (see https://core.telegram.org/api/peers#peer-id).
             - `str`: first try Telethon's resolver (username, phone, etc).
-              If that fails, fall back to scanning dialogs and picking the *unique* match by:
-              - dialog name contains `entity` (case-insensitive), or
-              - dialog peer id equals `entity`, or
-              - dialog entity id equals `entity`.
+
+            If that fails, fall back to scanning dialogs and picking the *unique* match by:
+                - dialog name contains `entity` (case-insensitive), or
+                - dialog peer id equals `entity`, or
+                - dialog entity id equals `entity`.
 
         message: The content string of the message.
 
@@ -110,7 +104,9 @@ async def list_messages(
     By default if no date range is specified and not limit is given, it fetches the latest message.
 
     Args:
-        entity: The entity to list messages from.
+        entity:
+            The entity to list messages from. `peer id` or `username` or `phone`
+
         date_start:
             The start date for the message range.
             Accepts natural language dates, e.g. "-2d", "yesterday", "2 weeks ago".

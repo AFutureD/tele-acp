@@ -1,7 +1,7 @@
 from typing import TypeAlias
 
 import acp
-from acp.schema import AudioContentBlock, EmbeddedResourceContentBlock, ImageContentBlock, ResourceContentBlock, TextContentBlock
+from acp.schema import AudioContentBlock, EmbeddedResourceContentBlock, ImageContentBlock, ResourceContentBlock, StopReason, TextContentBlock
 from pydantic import BaseModel
 
 AcpMessageChunk: TypeAlias = (
@@ -14,13 +14,14 @@ AcpMessageChunk: TypeAlias = (
 
 
 class AcpMessage(BaseModel):
+    # TODO: make it list and as message can handle queued messages.
     prompt: acp.schema.UserMessageChunk | str | None
 
     # sessonInfo: acp.schema.SessionInfoUpdate
     model: acp.schema.CurrentModeUpdate | None
     chunks: list[AcpMessageChunk] = []
     usage: acp.schema.UsageUpdate | None
-    in_turn: bool = True
+    stopReason: StopReason | None = None
 
     def markdown(self) -> str:
         def content_text(content: object) -> str:

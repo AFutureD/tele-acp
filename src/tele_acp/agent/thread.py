@@ -4,6 +4,7 @@ import asyncio
 import logging
 from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from pathlib import Path
+from typing import AsyncIterator
 
 import anyio
 import telethon
@@ -65,6 +66,9 @@ class AgentThread:
             mcp_servers=[mcp_server],
         )
 
+        self.queue_message_when_idle = False
+        self._turn_task: asyncio.Task | None = None
+
     def work_dir(self) -> Path:
         acp_cwd = self.agent_config.work_dir
         if acp_cwd:
@@ -88,21 +92,34 @@ class AgentThread:
 
                 self.logger.info("Dialog %s received: %s", self.dialog_id, content)
 
-                async with self.in_turn():
-                    async with self._message_lock:
-                        if self.message is None:
-                            self.logger.warning("Message state is not initialized for dialog %s", self.dialog_id)
-                            continue
-                        self.message.prompt = content
-                    prompt = f"""
-                    This is a message from Telegram.
-                    Dialog ID: {self.dialog_id}
-                    Peer ID: {self.peer.to_json()}
+                if not self.queue_message_when_idle:
+                    self._turn_task = asyncio.create_task(self.run_turn(content))
+                else:
+                    pass
 
-                    User Content:
-                    {content}
-                    """
-                    await self._forward_to_acp(prompt)
+    async def run_turn(self, content: str):
+        async with self.in_turn(content) as message:
+            prompt = (
+                # Context Info
+                f"<CONTEXT>"
+                f"This is a message from Telegram."
+                f"Dialog ID: {self.dialog_id}"
+                f"Peer ID: {self.peer.to_json()}"
+                f"</CONTEXT>"
+                f""
+                # IMPORTANT
+                f"<IMPORTANT>"
+                f"always using `Telegram MCP` send_message method when you have some message needs replay to this message."
+                f"</IMPORTANT>"
+                f""
+                # User Input
+                f"User Content:"
+                f"{content}"
+            )
+            response = await self._runtime.send_immediately(messages=[prompt])
+
+            message.stopReason = response.stopReason
+        pass
 
     async def _run_acp_message_handler(self) -> None:
         async with self._inner_outbound:
@@ -174,44 +191,49 @@ class AgentThread:
     async def command_session_reset(self) -> None:
         pass
 
-    async def _forward_to_acp(self, content: str) -> None:
-        try:
-            await self._runtime.prompt(content=content)
-            return
-        except Exception:
-            self.logger.exception("Prompt failed for dialog %s, retrying once", self.dialog_id)
-
-        await self._runtime.restart(self._runtime.agent_config)
-        await self._runtime.prompt(content=content)
-
     async def _send_system_message(self, message: str) -> None:
         await self.outbound_send.send(message)
 
     @asynccontextmanager
-    async def in_turn(self):
+    async def in_turn(self, content: str) -> AsyncIterator[AcpMessage]:
         try:
-            await self._start_turn()
-            yield
+            message = await self._start_turn(content)
+            yield message
         finally:
             await self._finish_turn()
 
-    async def _start_turn(self) -> None:
+    async def _start_turn(self, content: str) -> AcpMessage:
         async with self._message_lock:
-            self.message = AcpMessage(
+            message = self.message
+
+        if not (message is not None and message.stopReason == "cancelled"):
+            message = AcpMessage(
                 prompt=None,
                 model=None,
                 chunks=[],
                 usage=None,
             )
+        message.prompt = content
+
+        async with self._message_lock:
+            self.message = message
+        return message
 
     async def _finish_turn(self) -> None:
+        """
+        Clean up message.
+        keep it if this turn is stop by `cancelled` and can be reuse in next turn.
+        """
+
         async with self._message_lock:
-            if self.message is None:
+            message = self.message
+
+            if message is None:
                 return
 
-            final = self.message.model_copy(deep=True)
-            final.in_turn = False
+            self.logger.info(f"Agent turn has end {message.markdown()}")
 
-            self.message = None
+            if not (message.stopReason and message.stopReason == "cancelled"):
+                self.message = None
 
-        await self.outbound_send.send(final)
+        await self.outbound_send.send(message)

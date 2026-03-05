@@ -70,11 +70,17 @@ class ACPAgentRuntime:
         session = await self._new_session()
         return session
 
-    async def prompt(self, *, content: str) -> None:
+    async def send_immediately(self, *, messages: list[str]) -> acp.PromptResponse:
         conn = await self._ensure_conn()
         session = await self._ensure_session()
 
-        await conn.prompt(prompt=[acp.text_block(content)], session_id=session.session_id)
+        prompt = map(lambda m: acp.text_block(m), messages)
+        return await conn.prompt(prompt=list(prompt), session_id=session.session_id)
+
+    async def stop_and_send_immediately(self) -> None:
+        conn = await self._ensure_conn()
+        session = await self._ensure_session()
+        await conn.cancel(session_id=session.session_id)
 
     async def _new_session(self) -> acp.NewSessionResponse:
         conn = await self._ensure_conn()

@@ -139,10 +139,9 @@ class APP:
                 match message:
                     case str():
                         await self._tele_client.send_message(peer, message)
-                    case AcpMessage():
+                    case AcpMessage() if message.stopReason is not None and message.stopReason != "cancelled":
                         text = message.markdown()
-                        if not message.in_turn:
-                            await self._tele_client.send_message(peer, text)
+                        await self._tele_client.send_message(peer, text)
 
     async def _run_dialog_lifecycle(
         self, peer: telethon.types.TypePeer, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[OutBoundMessage]
