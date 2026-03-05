@@ -77,11 +77,12 @@ class APP:
         if message.out:
             return
 
+        peer = message.peer_id
+
         # User Only
-        if not isinstance(message.peer_id, telethon.types.PeerUser):
+        if not isinstance(peer, telethon.types.PeerUser):
             return
 
-        peer = message.peer_id
         contacts = await self._tele_client.get_contact_user_peer()
         if not any(contact.user_id == peer.user_id for contact in contacts):
             return
