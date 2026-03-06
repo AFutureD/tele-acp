@@ -17,7 +17,6 @@ from tele_acp.types import OutBoundMessage, peer_hash_into_str
 from tele_acp.types.acp import AcpMessage
 from tele_acp.types.agent import AgentConfig
 from tele_acp.types.config import Config
-from tele_acp.utils.throttle import Throttler
 
 
 @dataclass
@@ -138,7 +137,7 @@ class APP:
         return self._config.agents[0]
 
     async def _consume_outbound(self, peer: telethon.types.TypePeer, outbound_recv: MemoryObjectReceiveStream[OutBoundMessage]) -> None:
-        dialog_id = peer_hash_into_str(peer)
+        peer_hash_into_str(peer)
 
         async with outbound_recv:
             async for message in outbound_recv:
@@ -164,6 +163,7 @@ class APP:
                 acp_config=acp_config,
                 inbound_recv=inbound_recv,
                 outbound_send=outbound_send,
+                tele_action=self._tele_client,
             )
             await agent_thread.run_until_finish()
         except asyncio.CancelledError:

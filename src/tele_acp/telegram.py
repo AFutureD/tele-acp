@@ -1,12 +1,11 @@
 import asyncio
 import inspect
-import logging
-import pathlib
 import sqlite3
 import typing
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Protocol, cast
 
 import telethon
 from telethon import functions, hints
@@ -21,7 +20,11 @@ from tele_acp.session import TGSession, load_session, session_ensure_current_val
 from tele_acp.utils.fmt import format_me
 
 
-class TGClient(telethon.TelegramClient):
+class TGActionProvider(Protocol):
+    def with_action(self, peer: telethon.types.TypePeer, action: str) -> AbstractAsyncContextManager[object]: ...
+
+
+class TGClient(telethon.TelegramClient, TGActionProvider):
     @staticmethod
     def create(session_name: str | None, config: types.Config, with_current: bool = True) -> TGClient:
         session: TGSession = load_session(session_name, with_current=with_current)
@@ -271,3 +274,14 @@ class TGClient(telethon.TelegramClient):
         self.contacts_users_peer_last_update_date = now
 
         return self.contacts_users_peer
+
+    @asynccontextmanager
+    async def with_action(self, peer: telethon.types.TypePeer, action: str):
+        action_handle = self.action(peer, action)
+        if inspect.isawaitable(action_handle):
+            await action_handle
+            yield
+            return
+
+        async with cast(AbstractAsyncContextManager[object], action_handle):
+            yield

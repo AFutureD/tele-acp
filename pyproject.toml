@@ -50,5 +50,4 @@ line-length = 160
 docstring-code-format = true
 
 [tool.ruff.lint]
-fixable = ["ALL"]
-select = ["I"]
+extend-select = ["I"]

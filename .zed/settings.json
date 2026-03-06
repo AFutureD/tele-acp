@@ -3,8 +3,8 @@
     "Python": {
       "formatter": {
         "external": {
-          "command": "uv",
-          "arguments": ["run", "ruff", "format", "-"],
+          "command": "zsh",
+          "arguments": ["-c", "ruff check --fix --stdin-filename {buffer_path} | ruff format --stdin-filename {buffer_path}"],
         },
       },
       "format_on_save": "on",

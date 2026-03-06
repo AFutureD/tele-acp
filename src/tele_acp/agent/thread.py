@@ -14,7 +14,8 @@ from telethon.custom import Message
 
 from tele_acp.acp import ACPAgentConfig
 from tele_acp.shared import get_app_user_defualt_dir
-from tele_acp.types import AcpMessageChunk, OutBoundMessage, peer_hash_into_str
+from tele_acp.telegram import TGActionProvider
+from tele_acp.types import AcpMessageChunk, OutBoundMessage
 from tele_acp.types.acp import AcpMessage
 from tele_acp.types.agent import AgentConfig
 
@@ -42,12 +43,14 @@ class AgentThread:
         acp_config: ACPAgentConfig,
         inbound_recv: MemoryObjectReceiveStream[Message],
         outbound_send: MemoryObjectSendStream[OutBoundMessage],
+        tele_action: TGActionProvider,
     ) -> None:
         self.agent_config = agent_config
         self.peer = peer
         self.dialog_id = dialog_id
         self.inbound_recv = inbound_recv
         self.outbound_send = outbound_send
+        self._tele_action = tele_action
 
         self.logger = logging.getLogger(f"{__name__}:{dialog_id}")
 
@@ -101,19 +104,19 @@ class AgentThread:
         async with self.in_turn(content) as message:
             prompt = (
                 # Context Info
-                f"<CONTEXT>"
-                f"This is a message from Telegram."
-                f"Dialog ID: {self.dialog_id}"
-                f"Peer ID: {self.peer.to_json()}"
-                f"</CONTEXT>"
-                f""
+                f"<CONTEXT>\n"
+                f"This is a message from Telegram.\n"
+                f"Dialog ID: {self.dialog_id}\n"
+                f"Peer ID: {self.peer.to_json()}\n"
+                f"</CONTEXT>\n"
+                f"\n"
                 # IMPORTANT
-                f"<IMPORTANT>"
-                f"always using `Telegram MCP` send_message method when you have some message needs replay to this message."
-                f"</IMPORTANT>"
-                f""
+                f"<IMPORTANT>\n"
+                f"always using `Telegram MCP` send_message method when you have some message needs replay to this message.\n"
+                f"</IMPORTANT>\n"
+                f"\n"
                 # User Input
-                f"User Content:"
+                f"User Content:\n"
                 f"{content}"
             )
             response = await self._runtime.send_immediately(messages=[prompt])
@@ -198,7 +201,8 @@ class AgentThread:
     async def in_turn(self, content: str) -> AsyncIterator[AcpMessage]:
         try:
             message = await self._start_turn(content)
-            yield message
+            async with self._tele_action.with_action(self.peer, "typing"):
+                yield message
         finally:
             await self._finish_turn()
 

@@ -24,21 +24,6 @@ class AcpMessage(BaseModel):
     stopReason: StopReason | None = None
 
     def markdown(self) -> str:
-        def content_text(content: object) -> str:
-            if isinstance(content, acp.schema.TextContentBlock):
-                return content.text
-            return ""
-
-        def quote(text: str) -> str:
-            return "\n".join(f"> {line}" if line else ">" for line in text.splitlines())
-
-        def tool_label(chunk: acp.schema.ToolCallStart | acp.schema.ToolCallProgress) -> str:
-            if chunk.title:
-                return chunk.title
-            if chunk.kind:
-                return chunk.kind
-            return chunk.tool_call_id
-
         PARTITION_KEY = {acp.schema.AgentThoughtChunk: "THNIK", acp.schema.AgentMessageChunk: "MESSAGE", acp.schema.ToolCallProgress: "TOOL"}
 
         parts_list: list[tuple[str, list[acp.schema.AgentThoughtChunk] | list[acp.schema.AgentMessageChunk] | acp.schema.ToolCallProgress]] = []
@@ -66,8 +51,7 @@ class AcpMessage(BaseModel):
                 temp_part.append(chunk)  # type: ignore
                 parts_list.append((partition_key, temp_part))  # type: ignore
             else:
-                parts_list.append((partition_key, temp_part))  # type: ignore
-                tmp_parts_list.append((partition_key, [chunk]))  # type: ignore
+                parts_list.append((partition_key, [chunk]))  # type: ignore
 
         description: str = ""
 
@@ -102,18 +86,27 @@ class AcpMessage(BaseModel):
         def _description_tool(chunk: acp.schema.ToolCallProgress) -> str:
             if not chunk.status or chunk.status not in ["completed", "failed"]:
                 return ""
-            return f"> [{chunk.status}] {chunk.kind} {chunk.title} "
+
+            tool_call_id = chunk.tool_call_id
+            found = next((x for x in self.chunks if isinstance(x, acp.schema.ToolCallStart) and x.tool_call_id == tool_call_id), None)
+
+            if found is None:
+                return ""
+
+            return f"> [{chunk.status}] {found.title}\n"
 
         for partition_key, temp_part in parts_list:
             if partition_key == "THNIK":
+                description += "\n"
                 description += "".join([_description_think(chunk) for chunk in temp_part])  # type: ignore
             elif partition_key == "MESSAGE":
+                description += "\n"
                 description += "".join([_description_message(chunk) for chunk in temp_part])  # type: ignore
+                description += "\n"
             elif partition_key == "TOOL":
                 content = _description_tool(temp_part)  # type: ignore
                 if content != "":
                     description += "\n"
                     description += content  # type: ignore
-                    description += "\n"
 
         return description

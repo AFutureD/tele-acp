@@ -3,10 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import cast
 
-from mcp.server.auth.provider import AccessToken, TokenVerifier
-from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import Context, FastMCP
-from pydantic import AnyHttpUrl
 from telethon import hints
 
 from tele_acp.telegram import TGClient
