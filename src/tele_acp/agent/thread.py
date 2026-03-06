@@ -6,6 +6,7 @@ from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from pathlib import Path
 from typing import AsyncIterator
 
+import acp
 import anyio
 import telethon
 from acp.schema import HttpMcpServer, McpServerStdio, SseMcpServer
@@ -15,7 +16,7 @@ from telethon.custom import Message
 from tele_acp.acp import ACPAgentConfig
 from tele_acp.shared import get_app_user_defualt_dir
 from tele_acp.telegram import TGActionProvider
-from tele_acp.types import AcpMessageChunk, OutBoundMessage
+from tele_acp.types import OutBoundMessage
 from tele_acp.types.acp import AcpMessage
 from tele_acp.types.agent import AgentConfig
 
@@ -51,7 +52,19 @@ class AgentBaseThread:
         self.inbound_recv = inbound_recv
         self.outbound_send = outbound_send
 
-        inner_outbound_writer, inner_outbound = anyio.create_memory_object_stream[AcpMessageChunk](0)
+        inner_outbound_writer, inner_outbound = anyio.create_memory_object_stream[
+            acp.schema.UserMessageChunk
+            | acp.schema.AgentMessageChunk
+            | acp.schema.AgentThoughtChunk
+            | acp.schema.ToolCallStart
+            | acp.schema.ToolCallProgress
+            | acp.schema.AgentPlanUpdate
+            | acp.schema.AvailableCommandsUpdate
+            | acp.schema.CurrentModeUpdate
+            | acp.schema.ConfigOptionUpdate
+            | acp.schema.SessionInfoUpdate
+            | acp.schema.UsageUpdate,
+        ](0)
         self._inner_outbound = inner_outbound
 
         self._runtime = ACPAgentRuntime(
@@ -126,11 +139,38 @@ class AgentBaseThread:
         async with self._inner_outbound:
             async for chunk in self._inner_outbound:
                 async with self._message_lock:
-                    if self.message is None:
-                        continue
+                    await self.handle_session_update(chunk)
 
-                    # TODO: call method
-                    self.message.chunks.append(chunk)
+    async def handle_session_update(
+        self,
+        chunk: acp.schema.UserMessageChunk
+        | acp.schema.AgentMessageChunk
+        | acp.schema.AgentThoughtChunk
+        | acp.schema.ToolCallStart
+        | acp.schema.ToolCallProgress
+        | acp.schema.AgentPlanUpdate
+        | acp.schema.AvailableCommandsUpdate
+        | acp.schema.CurrentModeUpdate
+        | acp.schema.ConfigOptionUpdate
+        | acp.schema.SessionInfoUpdate
+        | acp.schema.UsageUpdate,
+    ):
+        if self.message is None:
+            return
+
+        match chunk:
+            case acp.schema.AgentMessageChunk():
+                self.message.chunks.append(chunk)
+            case acp.schema.AgentThoughtChunk():
+                self.message.chunks.append(chunk)
+            case acp.schema.ToolCallStart():
+                self.message.chunks.append(chunk)
+            case acp.schema.ToolCallProgress():
+                self.message.chunks.append(chunk)
+            case acp.schema.AgentPlanUpdate():
+                self.message.chunks.append(chunk)
+            case acp.schema.UsageUpdate():
+                self.message.usage = chunk
 
     @asynccontextmanager
     async def turn_context(self) -> AsyncIterator[None]:

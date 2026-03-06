@@ -5,11 +5,27 @@ import acp
 from acp import schema
 from anyio.streams.memory import MemoryObjectSendStream
 
-from tele_acp.types import AcpMessageChunk, unreachable
+from tele_acp.types import unreachable
 
 
 class ACPClient(acp.Client):
-    def __init__(self, outbound_send: MemoryObjectSendStream[AcpMessageChunk], logger: logging.Logger) -> None:
+    def __init__(
+        self,
+        outbound_send: MemoryObjectSendStream[
+            schema.UserMessageChunk
+            | schema.AgentMessageChunk
+            | schema.AgentThoughtChunk
+            | schema.ToolCallStart
+            | schema.ToolCallProgress
+            | schema.AgentPlanUpdate
+            | schema.AvailableCommandsUpdate
+            | schema.CurrentModeUpdate
+            | schema.ConfigOptionUpdate
+            | schema.SessionInfoUpdate
+            | schema.UsageUpdate
+        ],
+        logger: logging.Logger,
+    ) -> None:
         self._outbound_queue = outbound_send
         self._logger = logger
 
