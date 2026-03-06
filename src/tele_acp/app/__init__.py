@@ -137,7 +137,7 @@ class APP:
         return self._config.agents[0]
 
     async def _consume_outbound(self, peer: telethon.types.TypePeer, outbound_recv: MemoryObjectReceiveStream[OutBoundMessage]) -> None:
-        peer_hash_into_str(peer)
+        dialog_id = peer_hash_into_str(peer)
 
         async with outbound_recv:
             async for message in outbound_recv:
@@ -147,6 +147,7 @@ class APP:
                     case AcpMessage() if message.stopReason is not None and message.stopReason != "cancelled":
                         text = message.markdown()
                         await self._tele_client.send_message(peer, text)
+                        self.logger.info(f"Dialog {dialog_id} stopped: {message.stopReason}")
 
     async def _run_dialog_lifecycle(
         self, peer: telethon.types.TypePeer, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[OutBoundMessage]
