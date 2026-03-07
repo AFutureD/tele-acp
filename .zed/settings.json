@@ -4,7 +4,7 @@
       "formatter": {
         "external": {
           "command": "zsh",
-          "arguments": ["-c", "ruff check --fix --stdin-filename {buffer_path} | ruff format --stdin-filename {buffer_path}"],
+          "arguments": ["-c", "uv run ruff check --fix --stdin-filename {buffer_path} | uv run ruff format --stdin-filename {buffer_path}"],
         },
       },
       "format_on_save": "on",
@@ -19,5 +19,5 @@
       },
     },
   },
-  "file_scan_exclusions": [".idea", "__pycache__", ".DS_Store"],
+  "file_scan_exclusions": [".idea", "__pycache__", ".DS_Store", ".pytest_cache/", ".ruff_cache/", ".git/"],
 }

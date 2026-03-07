@@ -41,7 +41,7 @@ source-exclude = ["tests/**/*"]
 tele-acp = { workspace = true }
 
 [project.scripts]
-xie = "tele_acp.cli:cli"
+tele = "tele_acp.cli:cli"
 
 [tool.ruff]
 line-length = 160
