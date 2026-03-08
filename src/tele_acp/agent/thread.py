@@ -8,14 +8,11 @@ from typing import AsyncIterator
 
 import acp
 import anyio
-import telethon
 from acp.schema import HttpMcpServer, McpServerStdio, SseMcpServer
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from telethon.custom import Message
 
 from tele_acp.acp import ACPAgentConfig
 from tele_acp.shared import get_app_user_defualt_dir
-from tele_acp.telegram import TGActionProvider
 from tele_acp.types import OutBoundMessage
 from tele_acp.types.acp import AcpMessage
 from tele_acp.types.agent import AgentConfig
@@ -40,8 +37,6 @@ class AgentBaseThread:
         self,
         agent_config: AgentConfig,
         acp_config: ACPAgentConfig,
-        inbound_recv: MemoryObjectReceiveStream[Message],
-        outbound_send: MemoryObjectSendStream[OutBoundMessage],
         mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
@@ -49,8 +44,6 @@ class AgentBaseThread:
 
         self.id = agent_config.id
         self.agent_config = agent_config
-        self.inbound_recv = inbound_recv
-        self.outbound_send = outbound_send
 
         inner_outbound_writer, inner_outbound = anyio.create_memory_object_stream[
             acp.schema.UserMessageChunk
@@ -90,25 +83,12 @@ class AgentBaseThread:
 
         return get_agent_work_dir(acp_id)
 
-    async def run_until_finish(self) -> None:
+    @asynccontextmanager
+    async def run_until_finish(self):
         async with AsyncExitStack() as ts:
-            await ts.enter_async_context(self.outbound_send)
-            await ts.enter_async_context(self.inbound_recv)
             await ts.enter_async_context(self._runtime)
             await ts.enter_async_context(self._handler_acp_message())
-
-            async for message in self.inbound_recv:
-                content = message.message
-                if not content or not isinstance(content, str):
-                    continue
-
-                if not self.queue_message_when_idle:
-                    if self._turn_task is not None and not self._turn_task.done():
-                        self.logger.info("Agent turn is still running, skip new input")
-                        continue
-                    self._turn_task = asyncio.create_task(self.run_turn(content))
-                else:
-                    pass
+            yield
 
     def build_runtime_messages(self, content: str) -> list[str]:
         return [content]
@@ -124,6 +104,19 @@ class AgentBaseThread:
                         self.message.stopReason = response.stopReason
         finally:
             await self._finish_turn()
+
+    async def handle_inbound_message(self, message: Message):
+        content = message.message
+        if not content or not isinstance(content, str):
+            return
+
+        if not self.queue_message_when_idle:
+            if self._turn_task is not None and not self._turn_task.done():
+                self.logger.info("Agent turn is still running, skip new input")
+                return
+            self._turn_task = asyncio.create_task(self.run_turn(content))
+        else:
+            pass
 
     @asynccontextmanager
     async def _handler_acp_message(self):
@@ -211,53 +204,7 @@ class AgentBaseThread:
             if not (message.stopReason and message.stopReason == "cancelled"):
                 self.message = None
 
-        await self.outbound_send.send(message)
+        await self.handle_outbound_message(message)
 
-
-class AgentThread(AgentBaseThread):
-    def __init__(
-        self,
-        dialog_id: str,
-        peer: telethon.types.TypePeer,
-        agent_config: AgentConfig,
-        acp_config: ACPAgentConfig,
-        inbound_recv: MemoryObjectReceiveStream[Message],
-        outbound_send: MemoryObjectSendStream[OutBoundMessage],
-        tele_action: TGActionProvider,
-    ) -> None:
-        logger = logging.getLogger(f"{__name__}:{dialog_id}")
-
-        mcp_server = HttpMcpServer(name="telegram_mcp_server", url="http://127.0.0.1:9998/mcp", headers=[], type="http")
-        super().__init__(
-            agent_config=agent_config, acp_config=acp_config, inbound_recv=inbound_recv, outbound_send=outbound_send, mcp_servers=[mcp_server], logger=logger
-        )
-
-        self.peer = peer
-        self.dialog_id = dialog_id
-        self._tele_action = tele_action
-
-    @asynccontextmanager
-    async def turn_context(self) -> AsyncIterator[None]:
-        async with self._tele_action.with_action(self.peer, "typing"):
-            yield
-
-    def build_runtime_messages(self, content: str) -> list[str]:
-        prompt = (
-            # Context Info
-            f"<CONTEXT>\n"
-            f"This is a message from Telegram.\n"
-            f"Dialog ID: {self.dialog_id}\n"
-            f"Peer ID: {self.peer.to_json()}\n"
-            f"</CONTEXT>\n"
-            f"\n"
-            # IMPORTANT
-            f"<IMPORTANT>\n"
-            f"always using `Telegram MCP` send_message method when you have some message needs replay to this message.\n"
-            f"</IMPORTANT>\n"
-            f"\n"
-            # User Input
-            f"User Content:\n"
-            f"{content}"
-        )
-
-        return [prompt]
+    async def handle_outbound_message(self, message: OutBoundMessage):
+        pass

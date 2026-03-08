@@ -22,6 +22,30 @@ from tele_acp.utils.fmt import format_me
 
 class TGActionProvider(Protocol):
     def with_action(self, peer: telethon.types.TypePeer, action: str) -> AbstractAsyncContextManager[object]: ...
+    async def send_message(
+        self,
+        entity: hints.EntityLike,
+        message: hints.MessageLike = "",
+        *,
+        reply_to: None | int | telethon.types.Message = None,
+        attributes: list[telethon.types.TypeDocumentAttribute] | None = None,
+        parse_mode: str | None = None,
+        formatting_entities: None | typing.List[telethon.types.TypeMessageEntity] = None,
+        link_preview: bool = True,
+        file: hints.FileLike | list[hints.FileLike] | None = None,
+        thumb: hints.FileLike | None = None,
+        force_document: bool = False,
+        clear_draft: bool = False,
+        buttons: hints.MarkupLike | None = None,
+        silent: bool | None = None,
+        background: bool | None = None,
+        supports_streaming: bool = False,
+        schedule: "hints.DateLike" = None,
+        comment_to: int | telethon.types.Message | None = None,
+        nosound_video: bool | None = None,
+        send_as: hints.EntityLike | None = None,
+        message_effect_id: int | None = None,
+    ) -> telethon.types.Message: ...
 
 
 class TGClient(telethon.TelegramClient, TGActionProvider):

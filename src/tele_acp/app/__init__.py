@@ -1,31 +1,16 @@
 import asyncio
 import logging
-from contextlib import suppress
-from dataclasses import dataclass
+from contextlib import AsyncExitStack
 
-import anyio
 import telethon
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from telethon import events
 from telethon.custom import Message
 
-from tele_acp.acp import ACPAgentConfig
-from tele_acp.agent import AgentThread
 from tele_acp.mcp import MCP
 from tele_acp.telegram import TGClient
-from tele_acp.types import OutBoundMessage, peer_hash_into_str
-from tele_acp.types.acp import AcpMessage
-from tele_acp.types.agent import AgentConfig
 from tele_acp.types.config import Config
 
-
-@dataclass
-class DialogContext:
-    inbound_send: MemoryObjectSendStream[Message]
-    outbound_recv: MemoryObjectReceiveStream[OutBoundMessage]
-    outbound_consumer_task: asyncio.Task[None] | None
-    lifecycle_task: asyncio.Task[None] | None
-    last_activity_ts: float
+from .dialog import DialogManager
 
 
 class APP:
@@ -45,29 +30,23 @@ class APP:
         self._config = config
         self._tele_client = tele_client
         self._mcp_server: MCP = mcp_server
-        self._agents: list[ACPAgentConfig] = [
-            ACPAgentConfig(id="codex", name="Codex", acp_path="codex-acp", acp_args=[]),
-            ACPAgentConfig(id="kimi", name="Kimi CLI", acp_path="kimi", acp_args=["acp"]),
-        ]
 
-        self._dialog_dict_lock = asyncio.Lock()
-        self._dialog_ctx: dict[str, DialogContext] = {}
+        self._dialog_manager = DialogManager(config, tele_client)
 
     async def run_until_finish(self):
-        # start tg client
-        try:
-            async with self._tele_client as tele_client:
+        async with AsyncExitStack() as stack:
+            stack.push_async_callback(self._shutdown)
+            stack.callback(self.logger.info, "Finished")
 
-                async def _wait_for_disconnect() -> None:
-                    await tele_client.disconnected
+            tele_client = await stack.enter_async_context(self._tele_client)
+            await stack.enter_async_context(self._dialog_manager.run())
 
-                async with asyncio.TaskGroup() as group:
-                    group.create_task(self._mcp_server.run_streamable_http_async())
-                    group.create_task(_wait_for_disconnect())
-                    group.create_task(self._schedule_cron_clean_idle_dialogs())
-        finally:
-            await self._shutdown()
-            self.logger.info("Finished")
+            async def _wait_for_disconnect() -> None:
+                await tele_client.disconnected
+
+            group = await stack.enter_async_context(asyncio.TaskGroup())
+            group.create_task(self._mcp_server.run_streamable_http_async())
+            group.create_task(_wait_for_disconnect())
 
     async def on_tele_client_receive_message(self, event: events.NewMessage.Event):
         message: Message = event.message
@@ -89,136 +68,7 @@ class APP:
         await self.dispatch_tele_message(message)
 
     async def dispatch_tele_message(self, message: Message):
-        ctx = await self._get_or_create_dialog(message.peer_id)
-        ctx.last_activity_ts = asyncio.get_running_loop().time()
-        await ctx.inbound_send.send(message)
-
-    async def _get_or_create_dialog(self, peer: telethon.types.TypePeer) -> DialogContext:
-        dialog_id = peer_hash_into_str(peer)
-
-        async with self._dialog_dict_lock:
-            existing = self._dialog_ctx.get(dialog_id)
-            if existing:
-                return existing
-
-            loop = asyncio.get_running_loop()
-
-            inbound_send, inbound_recv = anyio.create_memory_object_stream[Message](0)
-            outbound_send, outbound_recv = anyio.create_memory_object_stream[OutBoundMessage](0)
-
-            outbound_consumer_task = loop.create_task(self._consume_outbound(peer, outbound_recv))
-            lifecycle_task = loop.create_task(self._run_dialog_lifecycle(peer, inbound_recv, outbound_send))
-
-            ctx = DialogContext(
-                inbound_send=inbound_send,
-                outbound_recv=outbound_recv,
-                outbound_consumer_task=outbound_consumer_task,
-                lifecycle_task=lifecycle_task,
-                last_activity_ts=loop.time(),
-            )
-            self._dialog_ctx[dialog_id] = ctx
-            return ctx
-
-    def list_agents(self) -> list[ACPAgentConfig]:
-        return [*self._agents]
-
-    def get_agent_by_id(self, agent_id: str) -> ACPAgentConfig | None:
-        for item in self._agents:
-            if item.id == agent_id:
-                return item
-        return None
-
-    async def get_acp_for_dialog(self, dialog_id: str) -> ACPAgentConfig:
-        _ = dialog_id
-        return self._agents[0]
-
-    async def get_agent_config_for_dialog(self, dialog_id: str) -> AgentConfig:
-        _ = dialog_id
-        return self._config.agents[0]
-
-    async def _consume_outbound(self, peer: telethon.types.TypePeer, outbound_recv: MemoryObjectReceiveStream[OutBoundMessage]) -> None:
-        dialog_id = peer_hash_into_str(peer)
-
-        async with outbound_recv:
-            async for message in outbound_recv:
-                match message:
-                    case str():
-                        await self._tele_client.send_message(peer, message)
-                    case AcpMessage() if message.stopReason is not None and message.stopReason != "cancelled":
-                        text = message.markdown()
-                        await self._tele_client.send_message(peer, text)
-                        self.logger.info(f"Dialog {dialog_id} stopped: {message.stopReason}")
-
-    async def _run_dialog_lifecycle(
-        self, peer: telethon.types.TypePeer, inbound_recv: MemoryObjectReceiveStream[Message], outbound_send: MemoryObjectSendStream[OutBoundMessage]
-    ) -> None:
-        dialog_id = peer_hash_into_str(peer)
-
-        try:
-            acp_config = await self.get_acp_for_dialog(dialog_id)
-            agent_config = await self.get_agent_config_for_dialog(dialog_id)
-            agent_thread = AgentThread(
-                dialog_id=dialog_id,
-                peer=peer,
-                agent_config=agent_config,
-                acp_config=acp_config,
-                inbound_recv=inbound_recv,
-                outbound_send=outbound_send,
-                tele_action=self._tele_client,
-            )
-            await agent_thread.run_until_finish()
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            self.logger.exception("AgentThread failed for dialog %s", dialog_id)
-        finally:
-            await self._close_dialog(dialog_id=dialog_id)
-
-    async def _close_dialog(self, dialog_id: str) -> None:
-        async with self._dialog_dict_lock:
-            ctx = self._dialog_ctx.get(dialog_id)
-
-        if not ctx:
-            return
-
-        with suppress(Exception):
-            await ctx.inbound_send.aclose()
-        with suppress(Exception):
-            await ctx.outbound_recv.aclose()
-
-        if ctx.outbound_consumer_task and not ctx.outbound_consumer_task.done():
-            ctx.outbound_consumer_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await ctx.outbound_consumer_task
-
-        if ctx.lifecycle_task and not ctx.lifecycle_task.done():
-            ctx.lifecycle_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await ctx.lifecycle_task
-
-        async with self._dialog_dict_lock:
-            if self._dialog_ctx.get(dialog_id) is ctx:
-                self._dialog_ctx.pop(dialog_id, None)
-
-    async def _schedule_cron_clean_idle_dialogs(self) -> None:
-        timeout_seconds = max(self._config.dialog_idle_timeout_minutes * 60, 1)
-        check_interval_seconds = min(60, timeout_seconds)
-        while True:
-            await asyncio.sleep(check_interval_seconds)
-
-            loop = asyncio.get_running_loop()
-            now = loop.time()
-
-            async with self._dialog_dict_lock:
-                stale_dialog_ids = [dialog_id for dialog_id, ctx in self._dialog_ctx.items() if now - ctx.last_activity_ts >= timeout_seconds]
-
-            for dialog_id in stale_dialog_ids:
-                self.logger.info("Closing idle dialog %s", dialog_id)
-                await self._close_dialog(dialog_id)
+        await self._dialog_manager.handle_message(message)
 
     async def _shutdown(self) -> None:
-        async with self._dialog_dict_lock:
-            dialog_ids = list(self._dialog_ctx.keys())
-
-        for dialog_id in dialog_ids:
-            await self._close_dialog(dialog_id)
+        pass
