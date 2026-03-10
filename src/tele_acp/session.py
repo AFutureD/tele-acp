@@ -7,6 +7,8 @@ from tele_acp.shared import get_app_user_defualt_dir
 
 from .types import CurrentSessionPathNotValidError
 
+ACTIVATED_SESSION_NAME = "Current"
+
 
 class TGSession(SQLiteSession):
     pass
@@ -19,7 +21,7 @@ def get_app_session_folder() -> Path:
 
 
 def get_app_session_current() -> Path:
-    return get_app_session_folder() / "Current.session"
+    return get_app_session_folder() / f"{ACTIVATED_SESSION_NAME}.session"
 
 
 def _get_session_path(session_name: str | None, with_current: bool) -> Path:

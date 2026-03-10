@@ -53,7 +53,7 @@ class ChannelsGateway:
             if channel.id in self._channels:
                 raise ValueError(f"Duplicate Telegram channel id: {channel.id}")
 
-            client = TGClient.create(config=channel)
+            client = TGClient.create_as_login(api_id=config.api_id, api_hash=config.api_hash, config=channel)
             client.add_event_handler(self._build_message_handler(channel.id), events.NewMessage())
 
             self._mcp_server.set_tele_client(channel.id, client)

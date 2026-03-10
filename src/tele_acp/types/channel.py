@@ -1,4 +1,5 @@
 import enum
+from typing import TypeAlias
 
 from pydantic import BaseModel, Field
 
@@ -22,8 +23,6 @@ DEFAULT_TELEGRAM_API_HASH = "d524b414d21f4d37f08684c1df41ac9c"
 
 class TelegramChannel(ChannelConfig):
     session_name: str | None = Field(default=None, description="The session name for the Telegram client")
-    api_id: int | None = Field(default=None, description="Telegram api_id")
-    api_hash: str | None = Field(default=None, description="Telegram api_hash")
 
     whitelist: list[str] | None = Field(default=[], description="The list of allowed users. peer id or group id")
 
@@ -39,6 +38,9 @@ class TelegramBotChannel(TelegramChannel):
     type: ChannelType = ChannelType.TELEGRAM_BOT
 
     token: str = Field(description="Telegram bot token")
+
+
+TypeTelegramChannel: TypeAlias = TelegramUserChannel | TelegramBotChannel
 
 
 class DialogBind(BaseModel):

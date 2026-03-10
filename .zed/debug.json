@@ -12,4 +12,28 @@
     // "args": ["message", "list", "4281316593", "--from", "today", "-n", "200"],
     // "args": ["message", "send", "-1003870893788", "Hi"],
   },
+  {
+    "label": "tele-acp Login User",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "tele_acp.cli",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "args": ["auth", "login"],
+  },
+  {
+    "label": "tele-acp Login Bot",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "tele_acp.cli",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "args": ["auth", "login", "--bot", "8777499436:AAGjg_RGoQwHS1p1NxShjutFEa4h9QVxxZU"],
+  },
+  {
+    "label": "tele-acp Logout Bot",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "tele_acp.cli",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "args": ["--session", "1ada7caf-57e8-4482-9cf0-9c37c58687bb", "auth", "logout"],
+  },
 ]

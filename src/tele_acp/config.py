@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from tomlkit.exceptions import TOMLKitError
 
 from .shared import get_app_user_defualt_dir
-from .types import Config, ConfigError
+from .types import Config, ConfigError, TypeTelegramChannel
 
 
 def get_config_default_path() -> Path:
@@ -15,15 +15,7 @@ def get_config_default_path() -> Path:
 
 
 def get_config_default() -> Config:
-    return Config()
-
-
-def save_config(config: Config, config_file: Path):
-    config_file.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(config_file, "w", encoding="utf-8") as f:
-        # TOML has no null type; omit None-valued optional fields.
-        tomlkit.dump(config.model_dump(mode="json", exclude_none=True), f)
+    return Config(api_id=611335, api_hash="d524b414d21f4d37f08684c1df41ac9c")
 
 
 def load_config(config_file: Path | None = None) -> Config:
@@ -31,7 +23,15 @@ def load_config(config_file: Path | None = None) -> Config:
 
     if not config_file.exists():
         config = get_config_default()
-        save_config(config=config, config_file=config_file)
+
+        def _save_config(config: Config, config_file: Path):
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(config_file, "w", encoding="utf-8") as f:
+                # TOML has no null type; omit None-valued optional fields.
+                tomlkit.dump(config.model_dump(mode="json", exclude_none=True), f)
+
+        _save_config(config=config, config_file=config_file)
         return config
 
     try:
@@ -44,3 +44,57 @@ def load_config(config_file: Path | None = None) -> Config:
         raise ConfigError(f"Invalid configuration file: {e}") from e
 
     return config
+
+
+def update_or_save_channel_config(channel: TypeTelegramChannel, config_file: Path | None = None):
+    config_file = config_file or get_config_default_path()
+
+    if not config_file.exists():
+        return
+
+    config_text = config_file.read_text(encoding="utf-8")
+    data = tomlkit.loads(config_text)
+
+    channel_item = tomlkit.item(channel.model_dump(mode="json", exclude_none=True))
+    channels = data.get("channels")
+
+    if channels is None:
+        channels = tomlkit.aot()
+
+    for index, item in enumerate(list(channels)):
+        if item.get("id") != channel.id:
+            continue
+        del channels[index]
+        break
+
+    channels.append(channel_item)
+    data["channels"] = channels
+
+    with open(config_file, "w", encoding="utf-8") as f:
+        tomlkit.dump(data, f)
+
+
+def delete_channel_config(session_name: str, config_file: Path | None = None):
+    config_file = config_file or get_config_default_path()
+
+    if not config_file.exists():
+        return
+
+    config_text = config_file.read_text(encoding="utf-8")
+    data = tomlkit.loads(config_text)
+
+    channels = data.get("channels")
+
+    if channels is None:
+        channels = tomlkit.aot()
+
+    for index, item in enumerate(list(channels)):
+        if item.get("session_name") != session_name:
+            continue
+        del channels[index]
+        break
+
+    data["channels"] = channels
+
+    with open(config_file, "w", encoding="utf-8") as f:
+        tomlkit.dump(data, f)

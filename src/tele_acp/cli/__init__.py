@@ -90,9 +90,15 @@ def me_get(ctx: typer.Context) -> None:
     cli_args: SharedArgs = ctx.obj
 
     async def _run() -> bool:
-        tg = TGClient.create(session_name=cli_args.session, config=load_config(config_file=cli_args.config_file))
+        config = load_config(config_file=cli_args.config_file)
+        tele_client = TGClient.create_simple(
+            config.api_id,
+            config.api_hash,
+            cli_args.session,
+            with_current=False,
+        )
 
-        async with tg as tg:
+        async with tele_client as tg:
             me = await tg.get_user()
 
         if not me:

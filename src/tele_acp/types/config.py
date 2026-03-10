@@ -1,3 +1,5 @@
+from typing import Self
+
 from pydantic import BaseModel, Field, model_validator
 
 from .agent import DEFAULT_AGENT_ID, AgentConfig
@@ -5,10 +7,12 @@ from .channel import DEFAULT_TELEGRAM_ID, DialogBind, TelegramBotChannel, Telegr
 
 
 class Config(BaseModel):
+    api_id: int | None = Field(default=None, description="Telegram api_id")
+    api_hash: str | None = Field(default=None, description="Telegram api_hash")
     dialog_idle_timeout_minutes: int = Field(default=30, ge=1, description="Idle timeout for per-dialog context")
 
     channels: list[TelegramUserChannel | TelegramBotChannel] = [
-        TelegramUserChannel(id=DEFAULT_TELEGRAM_ID, api_id=611335, api_hash="d524b414d21f4d37f08684c1df41ac9c"),
+        TelegramUserChannel(id=DEFAULT_TELEGRAM_ID),
     ]
     agents: list[AgentConfig] = [AgentConfig(id=DEFAULT_AGENT_ID)]
     bindings: list[DialogBind] = []

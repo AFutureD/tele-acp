@@ -2,7 +2,7 @@ from typing import TypeAlias
 
 from .acp import AcpMessage, AcpMessageChunk
 from .agent import AgentConfig
-from .channel import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TelegramBotChannel, TelegramUserChannel
+from .channel import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TelegramBotChannel, TelegramUserChannel, TypeTelegramChannel
 from .config import Config
 from .error import ConfigError, CurrentSessionPathNotValidError, unreachable
 from .serialization import Format, Order
@@ -26,6 +26,7 @@ __all__ = [
     "OutBoundMessage",
     "TelegramUserChannel",
     "TelegramBotChannel",
+    "TypeTelegramChannel",
     "DEFAULT_TELEGRAM_API_ID",
     "DEFAULT_TELEGRAM_API_HASH",
 ]
