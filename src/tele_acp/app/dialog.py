@@ -9,14 +9,15 @@ from telethon.custom import Message
 
 from tele_acp.acp import ACPAgentConfig
 from tele_acp.agent.thread import AgentBaseThread
-from tele_acp.telegram import TGActionProvider
-from tele_acp.types import AcpMessage, AgentConfig, Config, OutBoundMessage, peer_hash_into_str
+from tele_acp.telegram import TGActionProvider, TGClient
+from tele_acp.types import AcpMessage, AgentConfig, Config, OutBoundMessage, TelegramBotChannel, TelegramUserChannel, peer_hash_into_str
 
 from .channels import InboundMessage
 
 ChannelID: TypeAlias = str
 DialogID: TypeAlias = str
 DialogKey: TypeAlias = tuple[ChannelID, DialogID]
+SUPPRESS_DIALOG_SECONDS = 120.0
 
 
 class Dialog(AgentBaseThread):
@@ -37,6 +38,7 @@ class Dialog(AgentBaseThread):
 
         self.peer = peer
         self._tele_action = tele_action
+        self._ignore_messages_until: float | None = None
 
         mcp_server = HttpMcpServer(
             name="telegram_mcp_server",
@@ -60,13 +62,40 @@ class Dialog(AgentBaseThread):
     def dialog_id(self) -> str:
         return self.dialog_key[1]
 
+    @property
+    def ignored_until(self) -> float | None:
+        if self._ignore_messages_until is None:
+            return None
+
+        now = asyncio.get_running_loop().time()
+        if self._ignore_messages_until <= now:
+            self._ignore_messages_until = None
+            return None
+
+        return self._ignore_messages_until
+
+    @property
+    def is_ignoring_messages(self) -> bool:
+        return self.ignored_until is not None
+
     @contextlib.asynccontextmanager
     async def turn_context(self) -> AsyncIterator[None]:
         async with self._tele_action.with_action(self.peer, "typing"):
             yield
 
     async def handle_message(self, message: Message):
+        if message.out:
+            self.ignore_responses_for(SUPPRESS_DIALOG_SECONDS)
+            return
+
+        if self.is_ignoring_messages:
+            return
+
         await self.handle_inbound_message(message)
+
+    def ignore_responses_for(self, seconds: float) -> None:
+        now = asyncio.get_running_loop().time()
+        self._ignore_messages_until = now + seconds
 
     async def handle_outbound_message(self, message: OutBoundMessage):
         peer = self.peer
@@ -119,6 +148,7 @@ class DialogManager:
 
         self._config = config
         self._mcp_server_url = mcp_server_url
+        self._channels_by_id: dict[str, TelegramUserChannel | TelegramBotChannel] = {channel.id: channel for channel in self._config.channels}
 
         # hard-coded agents used during development
         self._acp_agents: dict[str, ACPAgentConfig] = {
@@ -182,11 +212,44 @@ class DialogManager:
             return dialog
 
     async def handle_message(self, envelope: InboundMessage):
+        if not isinstance(envelope.peer, telethon.types.PeerUser):
+            return
+
+        if not await self._is_allowed(envelope.channel_id, envelope.client, envelope.peer):
+            return
+
         dialog = await self.get_dialog(envelope.channel_id, envelope.peer, envelope.client)
         if not dialog:
             return
 
         await dialog.handle_message(envelope.message)
+
+    async def _is_allowed(self, channel_id: str, tele_client: TGClient, peer: telethon.types.PeerUser) -> bool:
+        channel = self._channels_by_id.get(channel_id)
+        if channel is None:
+            raise ValueError(f"Unknown channel id: {channel_id}")
+
+        whitelist = channel.whitelist or []
+        if whitelist and self._peer_matches_whitelist(peer, whitelist):
+            return True
+
+        if isinstance(channel, TelegramUserChannel) and not channel.allow_contacts:
+            return False
+
+        contacts = await tele_client.get_contact_user_peer()
+        return any(contact.user_id == peer.user_id for contact in contacts)
+
+    def _peer_matches_whitelist(self, peer: telethon.types.TypePeer, whitelist: list[str]) -> bool:
+        raw_id: str | None = None
+        if isinstance(peer, telethon.types.PeerUser):
+            raw_id = str(peer.user_id)
+        elif isinstance(peer, telethon.types.PeerChat):
+            raw_id = str(peer.chat_id)
+        elif isinstance(peer, telethon.types.PeerChannel):
+            raw_id = str(peer.channel_id)
+
+        peer_hash = peer_hash_into_str(peer)
+        return any(item in {peer_hash, raw_id} for item in whitelist if raw_id is not None)
 
     async def get_acp_for_dialog(self, dialog_key: DialogKey) -> ACPAgentConfig:
         agent = await self.get_agent_config_for_dialog(dialog_key)

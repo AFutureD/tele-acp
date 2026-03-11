@@ -14,7 +14,7 @@ from telethon.custom import Message
 
 from tele_acp.mcp import MCP
 from tele_acp.telegram import TGClient
-from tele_acp.types import Config, TelegramBotChannel, TelegramUserChannel, peer_hash_into_str
+from tele_acp.types import Config
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +27,6 @@ class InboundMessage:
 
 @dataclass(frozen=True, slots=True)
 class Channel:
-    config: TelegramUserChannel | TelegramBotChannel
     client: TGClient
 
 
@@ -57,7 +56,7 @@ class ChannelsGateway:
             client.add_event_handler(self._build_message_handler(channel.id), events.NewMessage())
 
             self._mcp_server.set_tele_client(channel.id, client)
-            self._channels[channel.id] = Channel(config=channel, client=client)
+            self._channels[channel.id] = Channel(client=client)
 
     @contextlib.asynccontextmanager
     async def run(self) -> AsyncIterator[None]:
@@ -104,18 +103,12 @@ class ChannelsGateway:
         message: Message = event.message
         self.logger.info("New message received on channel `%s`: %s", channel_id, message)
 
-        if message.out:
-            return
-
         peer = message.peer_id
         if peer is None:
             return
 
         # Current dialog handling only supports direct user peers.
         if not isinstance(peer, telethon.types.PeerUser):
-            return
-
-        if not await self._is_allowed(channel, peer):
             return
 
         await self._on_message(
@@ -126,26 +119,3 @@ class ChannelsGateway:
                 peer=peer,
             )
         )
-
-    async def _is_allowed(self, channel: Channel, peer: telethon.types.PeerUser) -> bool:
-        whitelist = channel.config.whitelist or []
-        if whitelist and self._peer_matches_whitelist(peer, whitelist):
-            return True
-
-        if isinstance(channel.config, TelegramUserChannel) and not channel.config.allow_contacts:
-            return False
-
-        contacts = await channel.client.get_contact_user_peer()
-        return any(contact.user_id == peer.user_id for contact in contacts)
-
-    def _peer_matches_whitelist(self, peer: telethon.types.TypePeer, whitelist: list[str]) -> bool:
-        raw_id: str | None = None
-        if isinstance(peer, telethon.types.PeerUser):
-            raw_id = str(peer.user_id)
-        elif isinstance(peer, telethon.types.PeerChat):
-            raw_id = str(peer.chat_id)
-        elif isinstance(peer, telethon.types.PeerChannel):
-            raw_id = str(peer.channel_id)
-
-        peer_hash = peer_hash_into_str(peer)
-        return any(item in {peer_hash, raw_id} for item in whitelist if raw_id is not None)
