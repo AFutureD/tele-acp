@@ -14,7 +14,7 @@ from telethon.custom import Message
 
 from tele_acp.mcp import MCP
 from tele_acp.telegram import TGClient
-from tele_acp.types import Config
+from tele_acp.types import AcpMessage, Config
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,3 +119,45 @@ class ChannelsGateway:
                 peer=peer,
             )
         )
+
+
+def convert_acp_message_to_chat_message(message: AcpMessage) -> ChatMessage:
+    return ChatMessage(parts=[])
+
+
+class AgentThread:
+    def __init__(self):
+        pass
+
+    async def stop_and_send_message(self, message: str) -> AsyncIterator[AcpMessage]:
+        yield AcpMessage(
+            prompt=None,
+            model=None,
+            chunks=[],
+            usage=None,
+            stopReason=None,
+        )
+
+
+@dataclass
+class ChatMessage:
+    parts: list[str]
+
+
+class Chat:
+    def __init__(self):
+        self.agent_thread = AgentThread()
+        pass
+
+    async def receive_new_message(self, message: ChatMessage):
+        prompt = message.parts[0]
+
+        iter = self.agent_thread.stop_and_send_message(prompt)
+        async for delta in iter:
+            msg = convert_acp_message_to_chat_message(delta)
+            await self.write_message(msg)
+
+        pass
+
+    async def write_message(self, message: ChatMessage):
+        pass
