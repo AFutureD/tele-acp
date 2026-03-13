@@ -3,11 +3,11 @@ import contextlib
 from abc import abstractmethod
 from typing import AsyncIterator, Awaitable, Callable, Protocol
 
-from tele_acp import types
 import telethon
 from pydantic.dataclasses import dataclass
 from telethon.custom import Message
 
+from tele_acp import types
 from tele_acp.telegram import TGClient
 from tele_acp.types import AcpMessage, Config
 
@@ -18,6 +18,14 @@ def convert_acp_message_to_chat_message(message: AcpMessage) -> ChatMessage:
 
 def convert_telegram_message_to_chat_message(message: Message) -> ChatMessage:
     return ChatMessage.Empty()
+
+
+class AgentHub:
+    def __init__(self) -> None:
+        self._agents: dict[str, AgentThread] = {}
+
+    def get_agent(self, agent_id: str) -> AgentThread | None:
+        return self._agents[agent_id]
 
 
 class AgentThread:
@@ -48,12 +56,16 @@ class Channel(Protocol):
 
 
 class TelegramChannel(Channel):
+    """
+    屏蔽 telethon 对APP 内的影响
+    """
+
     def __init__(self, settings: types.TypeTelegramChannel, message_handler: Callable[[ChatMessage], Awaitable[None]]):
         tele_client = TGClient.create_as_login(None, None, settings)
         tele_client.add_event_handler(self._on_reveive_new_message_event, telethon.events.NewMessage())
         self._tele_client = tele_client
         self._message_handler = message_handler
-        self.channel_id =
+        self.channel_id = ""
 
     @contextlib.asynccontextmanager
     async def run_until_finish(self):
@@ -104,37 +116,91 @@ class Chat:
 
 
 class ChatManager:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, channel_hub: ChannelHub, agent_hub: AgentHub):
         self._config = config
+        self._channel_hub = channel_hub
+        self._agent_hub = agent_hub
+
+        self._chats: dict[str, Chat] = {}
+
+    async def send_message(self, message: ChatMessage):
+        pass
+
+    async def receive_message(self, message: ChatMessage):
+
+        pass
+
+    async def get_chat(self, chat_id: str) -> Chat:
+        if chat := self._chats.get(chat_id):
+            return chat
+
+        channel_id = ""
+        channel = self._channel_hub.get_channel(channel_id)
+        assert channel is not None, "channel not found"
+
+        agent_id = ""
+        agent = self._agent_hub.get_agent(agent_id)
+        assert agent is not None, "agent not found"
+
+        chat = Chat(channel, agent)
+
+        self._chats[chat_id] = chat
+        return chat
+
+
+class Router:
+    def __init__(self, chat_handler: ChatManager):
+        self._chat_handler = chat_handler
+        pass
+
+    async def route(self, message: ChatMessage) -> None:
+        # TODO: add middlewares in the future.
+        await self._chat_handler.receive_message(message)
+
+
+class ChannelHub:
+    def __init__(self, config: Config, router: Router | None = None) -> None:
+        self._config = config
+        self._router = router
 
         self._channels_lock = asyncio.Lock()
         self._channels: dict[str, Channel] = {}
+
+    def set_router(self, router: Router) -> None:
+        self._router = router
+
+    def get_channel(self, channel_id: str) -> Channel | None:
+        return self._channels.get(channel_id)
 
     @contextlib.asynccontextmanager
     async def run_until_finish(self):
         async with contextlib.AsyncExitStack() as stack:
             async with self._channels_lock:
                 for channel_settings in self._config.channels:
-                    channel = TelegramChannel(channel_settings, self.receive_message)
+                    channel = TelegramChannel(channel_settings, self._on_receive_new_message)
                     await stack.enter_async_context(channel.run_until_finish())
 
                     self._channels[channel.channel_id] = channel
 
             yield
 
-    def get_channel(self, channel_id: str) -> Channel | None:
-        return self._channels.get(channel_id)
+    async def _on_receive_new_message(self, message: ChatMessage) -> None:
+        assert self._router is not None
 
-    async def send_message(self, message: ChatMessage):
-        channel = self.get_channel(message.channel_id)
-        if not channel:
-            return
-        await channel.send_message(message)
-
-    async def receive_message(self, message: ChatMessage):
-        channel_id = message.channel_id
-        channel = self.get_channel(channel_id)
-        assert channel is not None
+        await self._router.route(message)
 
 
-        await channel.receive_message(message)
+class APP:
+    def __init__(self, config: Config):
+        agent_hub = AgentHub()
+        channel_hub = ChannelHub(config)
+        chat_manager = ChatManager(config, channel_hub, agent_hub)
+        router = Router(chat_manager)
+
+        channel_hub.set_router(router)
+
+        self._config = config
+        self._chat_manager = chat_manager
+        self._router = router
+        self._channel_hub = channel_hub
+        self._agent_hub = agent_hub
