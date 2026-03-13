@@ -2,23 +2,30 @@ import asyncio
 import contextlib
 import signal
 from abc import abstractmethod
-from typing import AsyncIterator, Awaitable, Callable, Protocol
+from typing import Any, AsyncIterator, Awaitable, Callable, Protocol
 
 import telethon
+from pydantic import Field
 from pydantic.dataclasses import dataclass
 from telethon.custom import Message
 
 from tele_acp import types
 from tele_acp.telegram import TGClient
-from tele_acp.types import AcpMessage, Config, TelegramUserChannel
+from tele_acp.types import AcpMessage, Config, TelegramUserChannel, peer_hash_into_str
 
 
 def convert_acp_message_to_chat_message(message: AcpMessage) -> ChatMessage:
     return ChatMessage.Empty()
 
 
-def convert_telegram_message_to_chat_message(message: Message) -> ChatMessage:
-    return ChatMessage.Empty()
+def convert_telegram_message_to_chat_message(channel_id: str, message: Message, lifespan: contextlib.AbstractAsyncContextManager | None = None) -> ChatMessage:
+    message_id = str(message.id)
+    chat_id: str = peer_hash_into_str(message.peer_id)
+
+    text_part: str | None = message.message
+    parts = [text_part] if text_part else []
+
+    return ChatMessage(id=message_id, channel_id=channel_id, chat_id=chat_id, parts=parts, lifespan=lifespan)
 
 
 class ChatReplierHub:
@@ -74,7 +81,7 @@ class Channel(Protocol):
 
 class TelegramChannel(Channel):
     """
-    屏蔽 telethon 对APP 内的影响
+    屏蔽 telethon 对 APP 的细节
     """
 
     def __init__(self, settings: types.TypeTelegramChannel, message_handler: Callable[[ChatMessage], Awaitable[None]]):
@@ -100,18 +107,29 @@ class TelegramChannel(Channel):
     async def _on_reveive_new_message_event(self, event: telethon.events.NewMessage.Event):
         """Handle message from telethon client"""
 
-        chat_message = convert_telegram_message_to_chat_message(event.message)
+        message = event.message
+
+        chat_message = convert_telegram_message_to_chat_message(self.channel_id, message, lifespan=self.build_message_lifespan(message.peer_id))
         await self.receive_message(chat_message)
+
+    @contextlib.asynccontextmanager
+    async def build_message_lifespan(self, peer: telethon.types.TypePeer) -> AsyncIterator[None]:
+        async with self._tele_client.with_action(peer, "typing"):
+            yield
 
 
 @dataclass
 class ChatMessage:
-    channel_id: str
-    parts: list[str]
+    id: str | None = Field(description="The identifier of the message in the chat")
+    channel_id: str = Field(description="Which channel this message was sent from")
+    chat_id: str = Field(description="Which chat this message wants to be sent to")
+    parts: list[str] = Field(default_factory=list, description="The Message")
+    lifespan: contextlib.AbstractAsyncContextManager | None = None
+    _meta: dict[str, Any] = Field(default_factory=dict, description="Metadata for the message")
 
     @staticmethod
     def Empty() -> ChatMessage:
-        return ChatMessage(channel_id="", parts=[])
+        return ChatMessage(id=None, channel_id="", chat_id="", parts=[])
 
 
 class Chat:
@@ -139,7 +157,8 @@ class ChatManager:
         pass
 
     async def receive_message(self, message: ChatMessage):
-        pass
+        chat = await self.get_chat(message.channel_id)
+        await chat.receive_message(message)
 
     async def get_chat(self, chat_id: str) -> Chat:
         if chat := self._chats.get(chat_id):
@@ -183,6 +202,10 @@ class ChannelHub:
         self._channels_lock = asyncio.Lock()
         self._channels: dict[str, Channel] = {}
 
+        for channel_settings in self._config.channels:
+            channel = TelegramChannel(channel_settings, self._on_receive_new_message)
+            self._channels[channel.channel_id] = channel
+
     def set_router(self, router: Router) -> None:
         self._router = router
 
@@ -193,14 +216,12 @@ class ChannelHub:
     async def run(self) -> AsyncIterator[ChannelHub]:
         async with contextlib.AsyncExitStack() as stack:
             async with self._channels_lock:
-                for channel_settings in self._config.channels:
-                    channel = TelegramChannel(channel_settings, self._on_receive_new_message)
+                for channel in self._channels.values():
                     await stack.enter_async_context(channel.run_until_finish())
-
-                    self._channels[channel.channel_id] = channel
             yield self
 
     async def _on_receive_new_message(self, message: ChatMessage) -> None:
+        """Called when a new message is received from a channel."""
         assert self._router is not None
 
         await self._router.route(message)
