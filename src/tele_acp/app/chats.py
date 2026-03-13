@@ -1,7 +1,7 @@
 import asyncio
 import contextlib
 from abc import abstractmethod
-from typing import AsyncIterator, Awaitable, Callable, Protocol
+from typing import AsyncIterator, Awaitable, Callable, Protocol, Self
 
 import telethon
 from pydantic.dataclasses import dataclass
@@ -49,10 +49,14 @@ class Channel(Protocol):
         yield
 
     @abstractmethod
-    async def send_message(self, message: ChatMessage): ...
+    async def send_message(self, message: ChatMessage):
+        """Channel Outbound"""
+        ...
 
     @abstractmethod
-    async def receive_message(self, message: ChatMessage): ...
+    async def receive_message(self, message: ChatMessage):
+        """Channel Inobound"""
+        ...
 
 
 class TelegramChannel(Channel):
@@ -81,6 +85,8 @@ class TelegramChannel(Channel):
         await self._message_handler(message)
 
     async def _on_reveive_new_message_event(self, event: telethon.events.NewMessage.Event):
+        """Handle message from telethon client"""
+
         chat_message = convert_telegram_message_to_chat_message(event.message)
         await self.receive_message(chat_message)
 
@@ -151,11 +157,17 @@ class ChatManager:
 class Router:
     def __init__(self, chat_handler: ChatManager):
         self._chat_handler = chat_handler
-        pass
+        self._accepting = True
 
     async def route(self, message: ChatMessage) -> None:
+        if not self._accepting:
+            return
+
         # TODO: add middlewares in the future.
         await self._chat_handler.receive_message(message)
+
+    def stop_accepting(self) -> None:
+        self._accepting = False
 
 
 class ChannelHub:
@@ -173,7 +185,7 @@ class ChannelHub:
         return self._channels.get(channel_id)
 
     @contextlib.asynccontextmanager
-    async def run_until_finish(self):
+    async def run(self) -> AsyncIterator[ChannelHub]:
         async with contextlib.AsyncExitStack() as stack:
             async with self._channels_lock:
                 for channel_settings in self._config.channels:
@@ -182,7 +194,7 @@ class ChannelHub:
 
                     self._channels[channel.channel_id] = channel
 
-            yield
+            yield self
 
     async def _on_receive_new_message(self, message: ChatMessage) -> None:
         assert self._router is not None
@@ -204,3 +216,26 @@ class APP:
         self._router = router
         self._channel_hub = channel_hub
         self._agent_hub = agent_hub
+
+        self._shutdown = asyncio.Event()
+
+    @contextlib.asynccontextmanager
+    async def run(self) -> AsyncIterator[Self]:
+
+        async with contextlib.AsyncExitStack() as stack:
+            await stack.enter_async_context(self._channel_hub.run())
+
+            try:
+                yield self
+            finally:
+                self._router.stop_accepting()
+
+    def shutdown(self) -> None:
+        self._shutdown.set()
+
+    async def wait(self) -> None:
+        await self._shutdown.wait()
+
+    async def run_forever(self) -> None:
+        async with self.run():
+            await self.wait()
