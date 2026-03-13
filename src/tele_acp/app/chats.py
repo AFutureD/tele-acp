@@ -21,15 +21,19 @@ def convert_telegram_message_to_chat_message(message: Message) -> ChatMessage:
     return ChatMessage.Empty()
 
 
-class AgentHub:
+class ChatReplierHub:
     def __init__(self) -> None:
-        self._agents: dict[str, AgentThread] = {}
+        self._repliers: dict[str, ChatReplier] = {}
 
-    def get_agent(self, agent_id: str) -> AgentThread | None:
-        return self._agents[agent_id]
+    def get_replier(self, agent_id: str) -> ChatReplier | None:
+        return self._repliers.get(agent_id)
 
 
-class AgentThread:
+class ChatMessageReplyable(Protocol):
+    async def receive_message(self, chat: Chat, message: ChatMessage) -> None: ...
+
+
+class AgentThread(ChatMessageReplyable):
     def __init__(self):
         pass
 
@@ -43,13 +47,21 @@ class AgentThread:
         )
 
 
+class ChatReplier(AgentThread, ChatMessageReplyable):
+    async def receive_message(self, chat: Chat, message: ChatMessage) -> None:
+        prompt = message.parts[0]
+
+        iter = self.stop_and_send_message(prompt)
+        async for delta in iter:
+            msg = convert_acp_message_to_chat_message(delta)
+            await chat.send_message(msg)
+
+
 class Channel(Protocol):
-    @abstractmethod
     @contextlib.asynccontextmanager
     async def run_until_finish(self):
         yield
 
-    @abstractmethod
     async def send_message(self, message: ChatMessage):
         """Channel Outbound"""
         ...
@@ -103,30 +115,23 @@ class ChatMessage:
 
 
 class Chat:
-    def __init__(self, channel: Channel, agent: AgentThread):
-        self.agent_thread = agent
+    def __init__(self, channel: Channel, replier: ChatMessageReplyable):
+        self.replier = replier
         self.channel = channel
         pass
 
     async def receive_message(self, message: ChatMessage):
-        prompt = message.parts[0]
-
-        iter = self.agent_thread.stop_and_send_message(prompt)
-        async for delta in iter:
-            msg = convert_acp_message_to_chat_message(delta)
-            await self.send_message(msg)
-
-        pass
+        await self.replier.receive_message(self, message)
 
     async def send_message(self, message: ChatMessage):
         await self.channel.send_message(message)
 
 
 class ChatManager:
-    def __init__(self, config: Config, channel_hub: ChannelHub, agent_hub: AgentHub):
+    def __init__(self, config: Config, channel_hub: ChannelHub, replier_hub: ChatReplierHub):
         self._config = config
         self._channel_hub = channel_hub
-        self._agent_hub = agent_hub
+        self._replier_hub = replier_hub
 
         self._chats: dict[str, Chat] = {}
 
@@ -134,7 +139,6 @@ class ChatManager:
         pass
 
     async def receive_message(self, message: ChatMessage):
-
         pass
 
     async def get_chat(self, chat_id: str) -> Chat:
@@ -146,7 +150,7 @@ class ChatManager:
         assert channel is not None, "channel not found"
 
         agent_id = ""
-        agent = self._agent_hub.get_agent(agent_id)
+        agent = self._replier_hub.get_replier(agent_id)
         assert agent is not None, "agent not found"
 
         chat = Chat(channel, agent)
@@ -204,9 +208,9 @@ class ChannelHub:
 
 class APP:
     def __init__(self, config: Config):
-        agent_hub = AgentHub()
+        replier_hub = ChatReplierHub()
         channel_hub = ChannelHub(config)
-        chat_manager = ChatManager(config, channel_hub, agent_hub)
+        chat_manager = ChatManager(config, channel_hub, replier_hub)
         router = Router(chat_manager)
 
         channel_hub.set_router(router)
@@ -215,7 +219,7 @@ class APP:
         self._chat_manager = chat_manager
         self._router = router
         self._channel_hub = channel_hub
-        self._agent_hub = agent_hub
+        self._replier_hub = replier_hub
 
         self._shutdown = asyncio.Event()
 
