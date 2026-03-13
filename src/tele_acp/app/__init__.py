@@ -38,7 +38,7 @@ class APP:
 
             group = await stack.enter_async_context(asyncio.TaskGroup())
             group.create_task(self._mcp_server.run_streamable_http_async())
-            group.create_task(self._telegram_manager.wait_until_disconnect())
+            # group.create_task(self._telegram_manager.wait_until_disconnect())
 
     async def dispatch_tele_message(self, envelope: InboundMessage):
         await self._dialog_manager.handle_message(envelope)

@@ -1,6 +1,6 @@
 from typing import Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from .agent import DEFAULT_AGENT_ID, AgentConfig
 from .channel import DEFAULT_CHANNEL_ID, DialogBind, TelegramBotChannel, TelegramUserChannel
@@ -15,7 +15,7 @@ class Config(BaseModel):
     agents: list[AgentConfig] = [AgentConfig(id=DEFAULT_AGENT_ID)]
     bindings: list[DialogBind] = []
 
-    @model_validator(mode="after")
+    # @model_validator(mode="after")
     def check_bindings(self) -> Self:
         # Valiate Channels
         channel_ids = map(lambda x: x.id, self.channels)

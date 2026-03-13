@@ -5,7 +5,7 @@ from abc import abstractmethod
 from typing import Any, AsyncIterator, Awaitable, Callable, Protocol
 
 import telethon
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from pydantic.dataclasses import dataclass
 from telethon.custom import Message
 
@@ -58,6 +58,7 @@ class AgentThread(ChatMessageReplyable):
 class ChatReplier(AgentThread, ChatMessageReplyable):
     async def receive_message(self, chat: Chat, message: ChatMessage) -> None:
         prompt = message.parts[0]
+        print(prompt)
 
         iter = self.stop_and_send_message(prompt)
         async for delta in iter:
@@ -90,7 +91,7 @@ class TelegramChannel(Channel):
         tele_client.add_event_handler(self._on_reveive_new_message_event, telethon.events.NewMessage())
         self._tele_client = tele_client
         self._message_handler = message_handler
-        self.channel_id = ""
+        self.channel_id = settings.id
 
     @contextlib.asynccontextmanager
     async def run_until_finish(self):
@@ -119,14 +120,16 @@ class TelegramChannel(Channel):
             yield
 
 
-@dataclass
+@dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class ChatMessage:
+    """The Message in Chat"""
+
     id: str | None = Field(description="The identifier of the message in the chat")
     channel_id: str = Field(description="Which channel this message was sent from")
     chat_id: str = Field(description="Which chat this message wants to be sent to")
     parts: list[str] = Field(default_factory=list, description="The Message")
-    lifespan: contextlib.AbstractAsyncContextManager | None = None
-    _meta: dict[str, Any] = Field(default_factory=dict, description="Metadata for the message")
+    lifespan: contextlib.AbstractAsyncContextManager | None = Field(default=None, exclude=True)
+    meta: dict[str, Any] = Field(default_factory=dict, description="Metadata for the message")
 
     @staticmethod
     def Empty() -> ChatMessage:
@@ -266,7 +269,7 @@ class APP:
         self._shutdown.set()
 
 
-config = Config(channels=[TelegramUserChannel(id="default")])
+config = Config(channels=[TelegramUserChannel(id="default", session_name="a7321e7c-e74e-49f9-9e74-38967d1fb0f0")])
 app = APP(config)
 
 
