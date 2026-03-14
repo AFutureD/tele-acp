@@ -10,8 +10,9 @@ from pydantic.dataclasses import dataclass
 from telethon.custom import Message
 
 from tele_acp import types
+from tele_acp.acp import ACPAgentConfig
 from tele_acp.telegram import TGClient
-from tele_acp.types import AcpMessage, Config, TelegramUserChannel, peer_hash_into_str
+from tele_acp.types import AcpMessage, AgentConfig, Config, TelegramUserChannel, peer_hash_into_str
 from tele_acp.types.config import DEFAULT_AGENT_ID, DEFAULT_CHANNEL_ID, DialogBind
 
 
@@ -30,11 +31,19 @@ def convert_telegram_message_to_chat_message(channel_id: str, message: Message, 
 
 
 class ChatReplierHub:
-    def __init__(self) -> None:
-        self._repliers: dict[str, ChatMessageReplyable] = {}
+    def __init__(self, config: Config, acp_hub: ACPRuntimeHub) -> None:
+        self._config = config
+        self._acp_hub = acp_hub
 
-    def get_replier(self, agent_id: str) -> ChatMessageReplyable | None:
-        return self._repliers.get(agent_id)
+        self.settings: dict[str, AgentConfig] = {agent.id: agent for agent in config.agents}
+
+    def swarn_replier(self, agent_id: str) -> ChatMessageReplyable | None:
+        agent_settings = self.settings.get(agent_id)
+        if agent_settings is None:
+            return None
+
+        replier = ChatReplier(agent_settings, self._acp_hub.build_acp_runtime(agent_settings.acp_id))
+        return replier
 
 
 class ChatMessageReplyable(Protocol):
@@ -42,8 +51,9 @@ class ChatMessageReplyable(Protocol):
 
 
 class AgentThread(ChatMessageReplyable):
-    def __init__(self):
-        pass
+    def __init__(self, settings: AgentConfig, acp_runtime: ACPAgentRuntime):
+        self.settings = settings
+        self._acp_runtime = acp_runtime
 
     async def stop_and_send_message(self, message: str) -> AsyncIterator[AcpMessage]:
         yield AcpMessage(
@@ -173,8 +183,7 @@ class ChatManager:
         channel = self._channel_hub.get_channel(channel_id)
         assert channel is not None, "channel not found"
 
-        replier_id = binding.agent
-        replier = self._replier_hub.get_replier(replier_id)
+        replier = self._replier_hub.swarn_replier(binding.agent)
         assert replier is not None, "agent not found"
 
         chat = Chat(channel, replier)
@@ -240,9 +249,35 @@ class ChannelHub:
         await self._router.route(message)
 
 
+class ACPAgentRuntime:
+    def __init__(self) -> None:
+        pass
+
+
+class ACPRuntimeHub:
+    def __init__(self, config: Config) -> None:
+        self._config = config
+
+    def build_acp_runtime(self, agent_id: str) -> ACPAgentRuntime:
+        return ACPAgentRuntime()
+
+    def get_acp_config(self, agent_id: str) -> ACPAgentConfig | None:
+        # hard-coded agents used during development
+        _acp_agents: dict[str, ACPAgentConfig] = {
+            agent.id: agent
+            for agent in [
+                ACPAgentConfig("codex", "Codex", "codex-acp", []),
+                ACPAgentConfig("kimi", "Kimi CLI", "kimi", ["acp"]),
+            ]
+        }
+
+        return _acp_agents.get(agent_id)
+
+
 class APP:
     def __init__(self, config: Config):
-        replier_hub = ChatReplierHub()
+        acp_hub = ACPRuntimeHub(config)
+        replier_hub = ChatReplierHub(config, acp_hub)
         channel_hub = ChannelHub(config)
         chat_manager = ChatManager(config, channel_hub, replier_hub)
         router = Router(chat_manager)
