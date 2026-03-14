@@ -1,9 +1,8 @@
 import logging
-from typing import Any, TypeAlias
+from typing import Any, Awaitable, Callable, TypeAlias
 
 import acp
 from acp import schema
-from anyio.streams.memory import MemoryObjectSendStream
 
 from tele_acp.types import unreachable
 
@@ -25,59 +24,41 @@ ACPUpdateChunk: TypeAlias = (
 class ACPClient(acp.Client):
     def __init__(
         self,
-        outbound: MemoryObjectSendStream[ACPUpdateChunk],
+        on_session_update: Callable[[str, ACPUpdateChunk], Awaitable[None]],
         logger: logging.Logger | None,
     ) -> None:
-        self._outbound_queue = outbound
+        self._on_session_update = on_session_update
         self.logger = logger or logging.getLogger(__name__)
 
     def on_connect(self, conn: acp.Agent) -> None:
         self.logger.info("Connected to ACP agent: %s", conn)
 
-    async def session_update(
-        self,
-        session_id: str,
-        update: schema.UserMessageChunk
-        | schema.AgentMessageChunk
-        | schema.AgentThoughtChunk
-        | schema.ToolCallStart
-        | schema.ToolCallProgress
-        | schema.AgentPlanUpdate
-        | schema.AvailableCommandsUpdate
-        | schema.CurrentModeUpdate
-        | schema.ConfigOptionUpdate
-        | schema.SessionInfoUpdate
-        | schema.UsageUpdate,
-        **kwargs: Any,
-    ) -> None:
-        # self.logger.info("session_update")
-        # self.logger.info(update)
-
+    async def session_update(self, session_id: str, update: ACPUpdateChunk, **kwargs: Any) -> None:
         _ = kwargs
 
         match update:
             case schema.UserMessageChunk():
-                await self.handle_user_message_chunk(session_id, update)
+                self._on_session_update(session_id, update)
             case schema.AgentMessageChunk():
-                await self.handle_agent_message_chunk(session_id, update)
+                self._on_session_update(session_id, update)
             case schema.AgentThoughtChunk():
-                await self.handle_agent_message_chunk(session_id, update)
+                self._on_session_update(session_id, update)
             case schema.ToolCallStart():
-                await self.handle_tool_call_start(session_id, update)
+                self._on_session_update(session_id, update)
             case schema.ToolCallProgress():
-                await self.handle_tool_call_progress(session_id, update)
+                self._on_session_update(session_id, update)
             case schema.AgentPlanUpdate():
-                await self.handle_agent_plan_update(session_id, update)
+                self._on_session_update(session_id, update)
             case schema.AvailableCommandsUpdate():
-                await self.handle_available_commands_update(session_id, update)
+                self._on_session_update(session_id, update)
             case schema.CurrentModeUpdate():
-                await self.handle_current_mode_update(session_id, update)
+                self._on_session_update(session_id, update)
             case schema.ConfigOptionUpdate():
-                await self.handle_config_option_update(session_id, update)
+                self._on_session_update(session_id, update)
             case schema.SessionInfoUpdate():
-                await self.handle_session_info_update(session_id, update)
+                self._on_session_update(session_id, update)
             case schema.UsageUpdate():
-                await self.handle_usage_update(session_id, update)
+                self._on_session_update(session_id, update)
 
     async def request_permission(
         self, options: list[schema.PermissionOption], session_id: str, tool_call: schema.ToolCallUpdate, **kwargs: Any
@@ -126,37 +107,3 @@ class ACPClient(acp.Client):
 
     async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
         raise NotImplementedError("External notification not implemented")
-
-    async def handle_user_message_chunk(self, session_id: str, update: schema.UserMessageChunk) -> None:
-        _ = session_id, update
-
-    async def handle_agent_message_chunk(self, session_id: str, update: schema.AgentMessageChunk | schema.AgentThoughtChunk) -> None:
-        _ = session_id, update
-        await self._outbound_queue.send(update)
-
-    async def handle_tool_call_start(self, session_id: str, update: schema.ToolCallStart) -> None:
-        _ = session_id, update
-        await self._outbound_queue.send(update)
-
-    async def handle_tool_call_progress(self, session_id: str, update: schema.ToolCallProgress) -> None:
-        _ = session_id, update
-        await self._outbound_queue.send(update)
-
-    async def handle_agent_plan_update(self, session_id: str, update: schema.AgentPlanUpdate) -> None:
-        _ = session_id, update
-        await self._outbound_queue.send(update)
-
-    async def handle_available_commands_update(self, session_id: str, update: schema.AvailableCommandsUpdate) -> None:
-        _ = session_id, update
-
-    async def handle_current_mode_update(self, session_id: str, update: schema.CurrentModeUpdate) -> None:
-        _ = session_id, update
-
-    async def handle_config_option_update(self, session_id: str, update: schema.ConfigOptionUpdate) -> None:
-        _ = session_id, update
-
-    async def handle_session_info_update(self, session_id: str, update: schema.SessionInfoUpdate) -> None:
-        _ = session_id, update
-
-    async def handle_usage_update(self, session_id: str, update: schema.UsageUpdate) -> None:
-        _ = session_id, update
