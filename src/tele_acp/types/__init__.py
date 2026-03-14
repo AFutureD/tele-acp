@@ -1,6 +1,6 @@
 from typing import TypeAlias
 
-from .acp import AcpMessage, AcpMessageChunk
+from .acp import AcpContentBlock, AcpMessage, AcpMessageChunk
 from .agent import AgentConfig
 from .channel import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TelegramBotChannel, TelegramUserChannel, TypeTelegramChannel
 from .config import Config
@@ -22,6 +22,7 @@ __all__ = [
     "unreachable",
     "AgentConfig",
     "AcpMessageChunk",
+    "AcpContentBlock",
     "AcpMessage",
     "OutBoundMessage",
     "TelegramUserChannel",

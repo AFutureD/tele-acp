@@ -3,22 +3,30 @@ import contextlib
 import logging
 import signal
 from abc import abstractmethod
+from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Protocol
 
+import acp
 import telethon
+from acp.client.connection import ClientSideConnection
+from acp.schema import HttpMcpServer, McpServerStdio, SseMcpServer
 from pydantic import ConfigDict, Field
 from pydantic.dataclasses import dataclass
 from telethon.custom import Message
 
 from tele_acp import types
-from tele_acp.acp import ACPAgentConfig
+from tele_acp.acp import ACPAgentConfig, ACPClient, ACPUpdateChunk
+from tele_acp.constant import VERSION
 from tele_acp.telegram import TGClient
-from tele_acp.types import AcpMessage, AgentConfig, Config, TelegramUserChannel, peer_hash_into_str
+from tele_acp.types import AcpContentBlock, AcpMessage, AgentConfig, Config, TelegramUserChannel, peer_hash_into_str
 from tele_acp.types.config import DEFAULT_AGENT_ID, DEFAULT_CHANNEL_ID, DialogBind
 
 
 def convert_acp_message_to_chat_message(message: AcpMessage) -> ChatMessage:
-    return ChatMessage.Empty()
+    text = message.markdown()
+    parts = [text] if text else []
+
+    return ChatMessage(id=None, channel_id="", chat_id="", parts=parts)
 
 
 def convert_telegram_message_to_chat_message(channel_id: str, message: Message, lifespan: contextlib.AbstractAsyncContextManager | None = None) -> ChatMessage:
@@ -43,7 +51,7 @@ class ChatReplierHub:
         if agent_settings is None:
             return None
 
-        runtime = await self._acp_hub.build_acp_runtime(agent_settings.acp_id)
+        runtime = await self._acp_hub.build_acp_runtime(agent_settings)
         replier = ChatReplier(agent_settings, runtime)
         return replier
 
@@ -59,24 +67,20 @@ class AgentThread(ChatMessageReplyable):
         self.logger = logging.getLogger(__name__)
 
     async def stop_and_send_message(self, message: str) -> AsyncIterator[AcpMessage]:
-        yield AcpMessage(
-            prompt=None,
-            model=None,
-            chunks=[],
-            usage=None,
-            stopReason=None,
-        )
+        async for item in self._acp_runtime.prompt([message]):
+            yield item
 
 
 class ChatReplier(AgentThread, ChatMessageReplyable):
     async def receive_message(self, chat: Chat, message: ChatMessage) -> None:
+        if len(message.parts) == 0:
+            return
+
         prompt = message.parts[0]
         self.logger.info(prompt)
 
-        await asyncio.sleep(5)
-
-        iter = self.stop_and_send_message(prompt)
-        async for delta in iter:
+        stream = self.stop_and_send_message(prompt)
+        async for delta in stream:
             msg = convert_acp_message_to_chat_message(delta)
             await chat.send_message(msg)
 
@@ -262,24 +266,18 @@ class ChannelHub:
         await self._router.route(message)
 
 
-class ACPAgentRuntime:
-    def __init__(self) -> None:
-        pass
-
-    @contextlib.asynccontextmanager
-    async def run(self):
-        yield self
-
-
 class ACPRuntimeHub:
     def __init__(self, config: Config) -> None:
         self._config = config
         self._stack: contextlib.AsyncExitStack | None
 
-    async def build_acp_runtime(self, agent_id: str) -> ACPAgentRuntime:
+    async def build_acp_runtime(self, agent: AgentConfig) -> ACPAgentRuntime:
         assert self._stack is not None
 
-        runtime = ACPAgentRuntime()
+        acp_config = self.get_acp_config(agent.acp_id)
+        assert acp_config is not None, "acp agent not found"
+
+        runtime = ACPAgentRuntime(acp_config, cwd=agent.work_dir)
         await self._stack.enter_async_context(runtime.run())
 
         return runtime
@@ -333,6 +331,203 @@ class APP:
 
     def shutdown(self) -> None:
         self._shutdown.set()
+
+
+class ACPAgentRuntime:
+    """spawn acp client based on ACPAgentConfig and maintain sessions"""
+
+    def __init__(
+        self,
+        agent_config: ACPAgentConfig,
+        cwd: str | Path | None = None,
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,
+        logger: logging.Logger | None = None,
+    ) -> None:
+        self._agent_config = agent_config
+        self._cwd = str(Path(cwd or Path.cwd()).resolve())
+        self._logger = logger or logging.getLogger(f"{__name__}.{self.__class__.__name__}:{agent_config.id}")
+
+        self._mcp_servers = mcp_servers
+
+        self._session: acp.NewSessionResponse | None = None
+
+        self._update_queue: asyncio.Queue[ACPUpdateChunk | None] | None = None
+
+        self._lock = asyncio.Lock()
+        self._stack: contextlib.AsyncExitStack | None = None
+        self._conn: ClientSideConnection | None = None
+        self._proc: object | None = None
+
+    @property
+    async def agent_config(self) -> ACPAgentConfig:
+        return self._agent_config
+
+    async def change(self, agent_config: ACPAgentConfig | None) -> None:
+        if agent_config:
+            self._agent_config = agent_config
+
+        await self._stop()
+        await self._start()
+
+    async def _ensure_conn(self) -> ClientSideConnection:
+        await self._start()
+        if self._conn is None:
+            raise RuntimeError("ACP connection is not available.")
+        return self._conn
+
+    async def _ensure_session(self) -> acp.NewSessionResponse:
+        if self._session:
+            return self._session
+
+        session = await self._new_session()
+        return session
+
+    async def prompt(self, parts: list[str]) -> AsyncIterator[AcpMessage]:
+        conn = await self._ensure_conn()
+        session = await self._ensure_session()
+
+        prompt: list[AcpContentBlock] = list(map(lambda m: acp.text_block(m), parts))
+
+        message = AcpMessage(prompt=prompt, model=None, usage=None)
+
+        update_queue = asyncio.Queue[ACPUpdateChunk | None]()
+        self._update_queue = update_queue
+
+        stop_token = asyncio.Event()
+
+        async def turn_task() -> acp.PromptResponse:
+            ret = await conn.prompt(prompt=prompt, session_id=session.session_id)
+            stop_token.set()
+            return ret
+
+        task = asyncio.create_task(turn_task())
+
+        try:
+            while True:
+                update = await update_queue.get()
+                if update is None:
+                    if stop_token.is_set():
+                        break
+                    continue
+
+                match update:
+                    case acp.schema.AgentMessageChunk():
+                        message.chunks.append(update)
+                    case acp.schema.AgentThoughtChunk():
+                        message.chunks.append(update)
+                    case acp.schema.ToolCallStart():
+                        message.chunks.append(update)
+                    case acp.schema.ToolCallProgress():
+                        message.chunks.append(update)
+                    case acp.schema.AgentPlanUpdate():
+                        message.chunks.append(update)
+                    case acp.schema.CurrentModeUpdate():
+                        message.model = update
+                    case acp.schema.UsageUpdate():
+                        message.usage = update
+                    case _:
+                        pass
+
+                yield message
+
+            response = await task
+            message.stopReason = response.stop_reason
+        finally:
+            self._update_queue = None
+
+            if not task.done():
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+
+    async def stop(self) -> None:
+        conn = await self._ensure_conn()
+        session = await self._ensure_session()
+        await conn.cancel(session_id=session.session_id)
+
+    async def new_session(self) -> str:
+        session = await self._new_session()
+        return session.session_id
+
+    async def _new_session(self) -> acp.NewSessionResponse:
+        conn = await self._ensure_conn()
+
+        session = await conn.new_session(cwd=self._cwd, mcp_servers=self._mcp_servers)
+        self._session = session
+
+        return session
+
+    async def _start(self):
+        if self._stack is not None:
+            return
+
+        agent_config = self._agent_config
+
+        async with contextlib.AsyncExitStack() as stack:
+            try:
+                acp_client = ACPClient(self._handle_session_update, self._logger)
+
+                conn, proc = await stack.enter_async_context(
+                    acp.spawn_agent_process(
+                        acp_client,
+                        agent_config.acp_path,
+                        *agent_config.acp_args,
+                        cwd=self._cwd,
+                        transport_kwargs={
+                            "limit": 10 * (2**10) * (2**10),  # Buffer Limit 10MB,
+                        },
+                    )
+                )
+
+                await conn.initialize(
+                    protocol_version=acp.PROTOCOL_VERSION,
+                    client_info=acp.Implementation(name="tele-acp", title="tele-acp", version=VERSION),
+                )
+            except Exception as e:
+                self._logger.error(f"Failed to start ACP agent process, Error: {e}", e)
+                raise
+
+            async with self._lock:
+                self._stack = stack
+                self._conn = conn
+                self._proc = proc
+
+    async def _stop(self) -> None:
+        async with self._lock:
+            stack = self._stack
+
+            self._stack = None
+            self._conn = None
+            self._proc = None
+
+        if stack:
+            await stack.aclose()
+
+    async def __aenter__(self):
+        await self._start()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self._stop()
+
+    @contextlib.asynccontextmanager
+    async def run(self):
+        await self._start()
+        try:
+            yield self
+        finally:
+            await self._stop()
+
+    async def _handle_session_update(self, session_id: str, update: ACPUpdateChunk) -> None:
+        queue = self._update_queue
+        session = self._session
+        if queue is None or session is None:
+            return
+
+        if session.session_id != session_id:
+            return
+
+        await queue.put(update)
 
 
 config = Config(channels=[TelegramUserChannel(id="default", session_name="a7321e7c-e74e-49f9-9e74-38967d1fb0f0")])

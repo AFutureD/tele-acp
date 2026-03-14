@@ -24,8 +24,8 @@ ACPUpdateChunk: TypeAlias = (
 class ACPClient(acp.Client):
     def __init__(
         self,
-        on_session_update: Callable[[str, ACPUpdateChunk], Awaitable[None]],
-        logger: logging.Logger | None,
+        on_session_update: Callable[[str, ACPUpdateChunk], Awaitable[None]] | None = None,
+        logger: logging.Logger | None = None,
     ) -> None:
         self._on_session_update = on_session_update
         self.logger = logger or logging.getLogger(__name__)
@@ -36,29 +36,33 @@ class ACPClient(acp.Client):
     async def session_update(self, session_id: str, update: ACPUpdateChunk, **kwargs: Any) -> None:
         _ = kwargs
 
+        handler = self._on_session_update
+        if handler is None:
+            return
+
         match update:
             case schema.UserMessageChunk():
-                self._on_session_update(session_id, update)
+                await handler(session_id, update)
             case schema.AgentMessageChunk():
-                self._on_session_update(session_id, update)
+                await handler(session_id, update)
             case schema.AgentThoughtChunk():
-                self._on_session_update(session_id, update)
+                await handler(session_id, update)
             case schema.ToolCallStart():
-                self._on_session_update(session_id, update)
+                await handler(session_id, update)
             case schema.ToolCallProgress():
-                self._on_session_update(session_id, update)
+                await handler(session_id, update)
             case schema.AgentPlanUpdate():
-                self._on_session_update(session_id, update)
+                await handler(session_id, update)
             case schema.AvailableCommandsUpdate():
-                self._on_session_update(session_id, update)
+                await handler(session_id, update)
             case schema.CurrentModeUpdate():
-                self._on_session_update(session_id, update)
+                await handler(session_id, update)
             case schema.ConfigOptionUpdate():
-                self._on_session_update(session_id, update)
+                await handler(session_id, update)
             case schema.SessionInfoUpdate():
-                self._on_session_update(session_id, update)
+                await handler(session_id, update)
             case schema.UsageUpdate():
-                self._on_session_update(session_id, update)
+                await handler(session_id, update)
 
     async def request_permission(
         self, options: list[schema.PermissionOption], session_id: str, tool_call: schema.ToolCallUpdate, **kwargs: Any

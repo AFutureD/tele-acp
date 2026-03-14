@@ -4,9 +4,10 @@ import acp
 from acp.schema import AudioContentBlock, EmbeddedResourceContentBlock, ImageContentBlock, ResourceContentBlock, StopReason, TextContentBlock
 from pydantic import BaseModel
 
-AcpMessageChunk: TypeAlias = (
+AcpAgentMessageChunk: TypeAlias = (
     acp.schema.AgentMessageChunk | acp.schema.AgentThoughtChunk | acp.schema.ToolCallStart | acp.schema.ToolCallProgress | acp.schema.AgentPlanUpdate
 )
+AcpContentBlock: TypeAlias = TextContentBlock | ImageContentBlock | AudioContentBlock | ResourceContentBlock | EmbeddedResourceContentBlock
 
 # | acp.schema.AvailableCommandsUpdate
 # | acp.schema.CurrentModeUpdate
@@ -15,12 +16,13 @@ AcpMessageChunk: TypeAlias = (
 
 class AcpMessage(BaseModel):
     # TODO: make it list and as message can handle queued messages.
-    prompt: acp.schema.UserMessageChunk | str | None
+    prompt: list[AcpContentBlock] = []
 
     # sessonInfo: acp.schema.SessionInfoUpdate
-    model: acp.schema.CurrentModeUpdate | None
-    chunks: list[AcpMessageChunk] = []
-    usage: acp.schema.UsageUpdate | None
+    model: acp.schema.CurrentModeUpdate | None = None
+    chunks: list[AcpAgentMessageChunk] = []
+
+    usage: acp.schema.UsageUpdate | None = None
     stopReason: StopReason | None = None
 
     def markdown(self) -> str:
