@@ -56,8 +56,7 @@ def auth_login(
 
             Example: 8615306541234
 
-            """,
-            fmt=cli_args.fmt,
+            """
         )
 
         return typer.prompt("Please enter phone number", type=str)
