@@ -29,7 +29,7 @@ class TelegramChannel(ChannelSettings):
 class TelegramUserChannel(TelegramChannel):
     type: ChannelType = ChannelType.TELEGRAM_USER
 
-    require_pre_authentication: bool = Field(default=True, description="Whether to require pre-authentication")
+    require_pre_authentication: bool = Field(default=True, description="Whether to require pre-authentication", exclude=True)
     allow_contacts: bool = Field(default=True, description="Whether to allow contacts")
 
 

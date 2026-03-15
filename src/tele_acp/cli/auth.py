@@ -104,7 +104,7 @@ def auth_login(
 
         update_or_save_channel_config(channel=channel, config_file=cli_args.config_file)
 
-        print(f"Hi {utils.fmt.format_me(me, cli_args.fmt)}", fmt=cli_args.fmt)
+        print(f"Hi {utils.fmt.format_me(me)}")
         return True
 
     ok = asyncio.run(_run())
@@ -136,7 +136,7 @@ def auth_logout(ctx: typer.Context):
         delete_channel_config(session_name=session_name, config_file=cli_args.config_file)
 
         if me:
-            print(f"Bye {utils.fmt.format_me(me, cli_args.fmt)}", fmt=cli_args.fmt)
+            print(f"Bye {utils.fmt.format_me(me)}")
         return True
 
     ok = asyncio.run(_run())
