@@ -61,18 +61,19 @@ class TelegramChannel(Channel):
     async def _on_reveive_new_message_event(self, event: telethon.events.NewMessage.Event):
         """Handle message from telethon client"""
 
-        message = event.message
+        message: TeleMessage = event.message
 
         peer_id = message.peer_id
         if not isinstance(peer_id, telethon.types.PeerUser):
             return
 
-        chat_message = convert_telegram_message_to_chat_message(self.id, message, lifespan=self.build_message_lifespan(peer_id))
+        chat_message = convert_telegram_message_to_chat_message(self.id, message, lifespan=self.build_message_lifespan(peer_id, message.id))
         await self.receive_message(chat_message)
 
     @contextlib.asynccontextmanager
-    async def build_message_lifespan(self, peer: telethon.types.TypePeer) -> AsyncIterator[None]:
+    async def build_message_lifespan(self, peer: telethon.types.TypePeer, message_id: int) -> AsyncIterator[None]:
         async with self._tele_client.with_action(peer, "typing"):
-            self.logger.info("Message lifespan started for peer: %s", peer)
+            # Read the message
+            await self._tele_client.send_read_acknowledge(peer, message_id)
+
             yield
-        self.logger.info("Message lifespan ended for peer: %s", peer)
