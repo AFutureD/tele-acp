@@ -2,18 +2,19 @@ import asyncio
 import contextlib
 import logging
 
-from tele_acp.types import Channel, Chatable, ChatMessage, ChatMessageReplyable
+from tele_acp.types import Channel, Chatable, ChatMessage, ChatMessageReplyable, ChatSettings
 
 IGNORE_MESSAGE_DURATION_IN_SECONDS = 120.0
 
 
 class Chat(Chatable):
-    def __init__(self, chat_id: str, channel: Channel, replier: ChatMessageReplyable):
+    def __init__(self, chat_id: str, channel: Channel, settings: ChatSettings, replier: ChatMessageReplyable):
         self.id = chat_id
         self.replier = replier
         self.channel = channel
         self.logger = logging.getLogger(__name__ + ":" + chat_id)
         self._ignore_until: float = asyncio.get_event_loop().time()
+        self.settings = settings
 
     @property
     def ignore_message(self) -> bool:
@@ -27,7 +28,7 @@ class Chat(Chatable):
             await self._handle_new_message(message)
 
     async def send_message(self, message: ChatMessage):
-        await self.channel.send_message(message)
+        await self.channel.send_message(self.settings.reporter or message.chat_id, message)
 
     async def _handle_sent_message(self, message: ChatMessage):
         _ = message

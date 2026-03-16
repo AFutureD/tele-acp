@@ -25,10 +25,10 @@ class AcpMessage(BaseModel):
     chunks: list[AcpAgentMessageChunk] = []
 
     usage: acp.schema.UsageUpdate | None = None
-    stopReason: StopReason | None = None
+    stop_reason: StopReason | None = None
 
     def markdown(self) -> str:
-        PARTITION_KEY = {acp.schema.AgentThoughtChunk: "THNIK", acp.schema.AgentMessageChunk: "MESSAGE", acp.schema.ToolCallProgress: "TOOL"}
+        PARTITION_KEY = {acp.schema.AgentThoughtChunk: "THINK", acp.schema.AgentMessageChunk: "MESSAGE", acp.schema.ToolCallProgress: "TOOL"}
 
         parts_list: list[tuple[str, list[acp.schema.AgentThoughtChunk] | list[acp.schema.AgentMessageChunk] | acp.schema.ToolCallProgress]] = []
 
@@ -100,7 +100,7 @@ class AcpMessage(BaseModel):
             return f"> [{chunk.status}] {found.title}\n"
 
         for partition_key, temp_part in parts_list:
-            if partition_key == "THNIK":
+            if partition_key == "THINK":
                 description += "\n"
                 description += "".join([_description_think(chunk) for chunk in temp_part])  # type: ignore
             elif partition_key == "MESSAGE":

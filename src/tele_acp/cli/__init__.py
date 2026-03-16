@@ -13,7 +13,7 @@ from tele_acp.utils import fmt
 
 from .auth import auth_cli
 from .mainloop import mainloop
-from .types import SharedArgs
+from .shared import SharedArgs
 
 cli = typer.Typer(
     epilog="Made by Huanan",

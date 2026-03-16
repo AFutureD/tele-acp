@@ -8,9 +8,22 @@ import acp
 
 from tele_acp.types import AgentConfig, Config
 
+from ..shared import get_app_user_defualt_dir
 from .client import ACPAgentConfig, ACPUpdateChunk
 from .connection import ACPAgentConnection
 from .message import AcpContentBlock, AcpMessage
+
+
+def _get_agent_work_folder():
+    ret = get_app_user_defualt_dir() / "workspace"
+    ret.mkdir(parents=True, exist_ok=True)
+    return ret
+
+
+def get_agent_work_dir(id: str) -> Path:
+    agent_dir = _get_agent_work_folder() / id
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    return agent_dir
 
 
 class ACPAgentRuntime(ACPAgentConnection):
@@ -98,7 +111,7 @@ class ACPAgentRuntime(ACPAgentConnection):
                 yield message
 
             response = await task  # unlikely raise error
-            message.stopReason = response.stop_reason
+            message.stop_reason = response.stop_reason
             yield message
 
             self.logger.info("End Prompt")
@@ -141,7 +154,7 @@ class ACPRuntimeHub:
         acp_config = self.get_acp_config(agent.acp_id)
         assert acp_config is not None, "acp agent not found"
 
-        runtime = ACPAgentRuntime(acp_config, cwd=agent.work_dir, mcp_servers=self._mcp_servers)
+        runtime = ACPAgentRuntime(acp_config, cwd=agent.work_dir or get_agent_work_dir(agent.id), mcp_servers=self._mcp_servers)
         await self._stack.enter_async_context(runtime)
 
         return runtime

@@ -5,7 +5,7 @@ import signal
 from tele_acp.app import APP
 from tele_acp.config import load_config
 
-from .types import SharedArgs
+from .shared import SharedArgs
 
 
 async def mainloop(cli_args: SharedArgs) -> bool:

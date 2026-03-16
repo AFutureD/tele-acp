@@ -39,10 +39,10 @@ class TelegramBotChannel(TelegramChannel):
 TypeTelegramChannel: TypeAlias = TelegramUserChannel | TelegramBotChannel
 
 
-class DialogBind(BaseModel):
+class ChatSettings(BaseModel):
     channel: str = Field(description="The id of the `Channel`")
     agent: str = Field(default=DEFAULT_AGENT_ID, description="The id of the `Agent`")
-    reporter: str | int | None = Field(default=None, description="Peer used for report messages of this binding")
+    reporter: str | None = Field(default=None, description="Peer used for report messages of this binding")
 
 
 class Config(BaseModel):
@@ -52,18 +52,18 @@ class Config(BaseModel):
 
     channels: dict[str, TypeTelegramChannel] = {}
     agents: list[AgentConfig] = [AgentConfig(id=DEFAULT_AGENT_ID)]
-    bindings: list[DialogBind] = []
+    bindings: list[ChatSettings] = []
 
     @model_validator(mode="after")
     def check_bindings(self) -> Self:
-        # Valiate Channels
+        # Validate Channels
         # if default_channel := self.default_channel:
         #     assert len(self.channels) != 0, "default_channel must be provided when channels is not empty"
         #     assert default_channel in self.channels, "default_channel must be present in channels"
         # else:
         #     assert len(self.channels) == 0, "default_channel can only be None when channels is empty"
 
-        # Valiate Agents
+        # Validate Agents
         agent_ids = map(lambda x: x.id, self.agents)
         agent_id_set = set(agent_ids)
         assert len(self.agents) >= 1, "At least one agent is required"

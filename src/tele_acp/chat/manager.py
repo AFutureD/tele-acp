@@ -1,8 +1,7 @@
 from tele_acp.channel.hub import ChannelHub
 from tele_acp.replier.hub import ChatReplierHub
-from tele_acp.types import Chatable, ChatMessage, Config
+from tele_acp.types import Chatable, ChatMessage, ChatSettings, Config
 from tele_acp.types.agent import DEFAULT_AGENT_ID
-from tele_acp.types.config import DialogBind
 
 from .chat import Chat
 
@@ -35,14 +34,14 @@ class ChatManager(Chatable):
         replier = await self._replier_hub.spawn_replier(binding.agent)
         assert replier is not None, "agent not found"
 
-        chat = Chat(chat_id, channel, replier)
+        chat = Chat(chat_id, channel, binding, replier)
 
         self._chats[chat_id] = chat
         return chat
 
-    async def get_binding(self, channel_id: str, chat_id: str) -> DialogBind:
+    async def get_binding(self, channel_id: str, chat_id: str) -> ChatSettings:
         _ = chat_id
-        return DialogBind(
+        return ChatSettings(
             agent=DEFAULT_AGENT_ID,
             channel=channel_id,
             reporter=None,

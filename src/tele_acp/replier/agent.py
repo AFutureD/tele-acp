@@ -31,8 +31,9 @@ class ChatReplier(AgentThread, ChatMessageReplyable):
 
         self.logger.info(prompt)
 
-        stream = self.stop_and_send_message(prompt.text)
+        stream: AsyncIterator[AcpMessage] = self.stop_and_send_message(prompt.text)
         async for delta in stream:
-            msg = convert_acp_message_to_chat_message(message.channel_id, message.chat_id, delta)
-            await chat.send_message(msg)
+            if (stop_reason := delta.stop_reason) and stop_reason != "cancelled":
+                msg = convert_acp_message_to_chat_message(message.channel_id, message.chat_id, delta)
+                await chat.send_message(msg)
         self.logger.info("Message sent for peer: %s", message.channel_id)

@@ -11,7 +11,7 @@ from tele_acp.config import delete_channel_config, load_config, update_or_save_c
 from tele_acp.session import TGSession, session_switch
 from tele_acp.types import TelegramBotChannel, TelegramUserChannel
 
-from .types import SharedArgs
+from .shared import SharedArgs
 
 auth_cli = typer.Typer(
     no_args_is_help=True,
