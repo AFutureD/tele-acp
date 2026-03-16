@@ -21,7 +21,7 @@ class ChannelSettings(BaseModel):
 
 
 class TelegramChannel(ChannelSettings):
-    session_name: str | None = Field(default=None, description="The session name for the Telegram client")
+    session_name: str = Field(description="The session name for the Telegram client")
 
     whitelist: list[str] | None = Field(default=[], description="The list of allowed users. peer id or group id")
 
@@ -29,7 +29,6 @@ class TelegramChannel(ChannelSettings):
 class TelegramUserChannel(TelegramChannel):
     type: ChannelType = ChannelType.TELEGRAM_USER
 
-    require_pre_authentication: bool = Field(default=True, description="Whether to require pre-authentication", exclude=True)
     allow_contacts: bool = Field(default=True, description="Whether to allow contacts")
 
 

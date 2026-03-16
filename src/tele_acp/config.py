@@ -5,6 +5,7 @@ from pathlib import Path
 import tomlkit
 from pydantic import ValidationError
 from tomlkit.exceptions import TOMLKitError
+from tomlkit.items import AoT
 
 from .shared import get_app_user_defualt_dir
 from .types import Config, ConfigError, TypeTelegramChannel
@@ -55,11 +56,13 @@ def update_or_save_channel_config(channel: TypeTelegramChannel, config_file: Pat
     config_text = config_file.read_text(encoding="utf-8")
     data = tomlkit.loads(config_text)
 
-    channel_item = tomlkit.item(channel.model_dump(mode="json", exclude_none=True))
     channels = data.get("channels")
 
-    if channels is None:
-        channels = tomlkit.aot()
+    if not isinstance(channels, AoT):  # create channels entry if not exists
+        if (channels is None) or (isinstance(channels, list) and len(channels) == 0):
+            channels = tomlkit.aot()
+        else:
+            raise ConfigError("Invalid channels entry.")
 
     for index, item in enumerate(list(channels)):
         if item.get("id") != channel.id:
@@ -67,7 +70,9 @@ def update_or_save_channel_config(channel: TypeTelegramChannel, config_file: Pat
         del channels[index]
         break
 
+    channel_item = tomlkit.item(channel.model_dump(mode="json", exclude_none=True))
     channels.append(channel_item)
+
     data["channels"] = channels
 
     with open(config_file, "w", encoding="utf-8") as f:

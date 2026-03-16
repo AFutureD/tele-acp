@@ -30,6 +30,7 @@ class Chat(Chatable):
         await self.channel.send_message(message)
 
     async def _handle_sent_message(self, message: ChatMessage):
+        _ = message
         now = asyncio.get_running_loop().time()
         self._ignore_until = now + IGNORE_MESSAGE_DURATION_IN_SECONDS
 

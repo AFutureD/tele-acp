@@ -88,7 +88,6 @@ class TGClient(telethon.TelegramClient, TGActionProvider):
         return self.session
 
     async def get_user(self) -> telethon.types.User | None:
-        await self.is_user_authorized()
         me = await self.get_me()
         return me if isinstance(me, telethon.types.User) else None
 
@@ -120,8 +119,10 @@ class TGClient(telethon.TelegramClient, TGActionProvider):
             return me if isinstance(me, telethon.types.User) else None
         except RPCError:
             session_ensure_current_valid(session=None)
+            raise
         except KeyboardInterrupt:
             session_ensure_current_valid(session=None)
+            raise
 
     async def login_as_bot(self, bot_token: str) -> telethon.types.User | None:
         try:
@@ -135,8 +136,10 @@ class TGClient(telethon.TelegramClient, TGActionProvider):
             return me if isinstance(me, telethon.types.User) else None
         except RPCError:
             session_ensure_current_valid(session=None)
+            raise
         except KeyboardInterrupt:
             session_ensure_current_valid(session=None)
+            raise
 
     async def get_session_info(self) -> SessionInfo | None:
         try:
