@@ -75,7 +75,7 @@ async def send_message(
     parts += [ChatMessageTextPart(content)]
     parts += list(map(lambda f: ChatMessageFilePart(path=f), file)) if file else []
 
-    message = ChatMessage(id=None, channel_id=channel_id, chat_id=chat_id, parts=parts)
+    message = ChatMessage(id=None, channel_id=channel_id, chat_id=chat_id, receiver=None, out=False, mute=False, parts=parts)
 
     try:
         await chat.send_message(message)

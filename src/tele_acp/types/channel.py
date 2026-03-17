@@ -1,10 +1,10 @@
 import contextlib
 from abc import abstractmethod
-from typing import AsyncIterator, Protocol, TypeAlias
+from typing import Any, AsyncIterator, Protocol, TypeAlias
 
 from .chat import ChatMessage
 
-ChannelPeer: TypeAlias = str
+ChannelPeer: TypeAlias = Any
 
 
 class Channel(Protocol):
@@ -18,12 +18,12 @@ class Channel(Protocol):
         yield self
 
     @abstractmethod
-    async def send_message(self, receiver: ChannelPeer, message: ChatMessage):
+    async def send_message(self, message: ChatMessage):
         """Channel Outbound"""
         ...
 
     @abstractmethod
-    async def receive_message(self, sender: ChannelPeer, message: ChatMessage):
+    async def receive_message(self, message: ChatMessage):
         """Channel Inbound"""
         ...
 

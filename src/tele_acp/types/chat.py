@@ -26,6 +26,7 @@ class ChatMessage:
 
     channel_id: str = Field(description="Which channel this message was sent from")
     chat_id: str = Field(description="Which chat this message wants to be sent to")
+    receiver: str | None = Field(description="Which user this message wants to be sent to")
 
     out: bool = Field(description="Is this an outgoing message")
 
@@ -39,7 +40,7 @@ class ChatMessage:
 
     @staticmethod
     def Empty() -> ChatMessage:
-        return ChatMessage(meta={}, id=None, channel_id="", chat_id="", out=False, mute=False)
+        return ChatMessage(meta={}, id=None, channel_id="", chat_id="", receiver="", out=False, mute=False)
 
 
 class Chatable(Protocol):

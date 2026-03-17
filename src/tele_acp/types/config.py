@@ -42,7 +42,7 @@ TypeTelegramChannel: TypeAlias = TelegramUserChannel | TelegramBotChannel
 class ChatSettings(BaseModel):
     channel: str = Field(description="The id of the `Channel`")
     agent: str = Field(default=DEFAULT_AGENT_ID, description="The id of the `Agent`")
-    reporter: str | None = Field(default=None, description="Peer used for report messages of this binding")
+    forward_to: str | None = Field(default=None, description="Peer used for report messages of this binding")
 
 
 class Config(BaseModel):

@@ -45,6 +45,9 @@ class APP:
             await stack.enter_async_context(self._channel_hub.run())
             await stack.enter_async_context(self._acp_hub.run())
 
+            group = await stack.enter_async_context(asyncio.TaskGroup())
+            group.create_task(self._mcp_server.run_streamable_http_async())
+
             await self._shutdown.wait()
 
             self._router.stop_accepting()

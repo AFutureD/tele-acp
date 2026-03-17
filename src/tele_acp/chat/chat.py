@@ -28,7 +28,8 @@ class Chat(Chatable):
             await self._handle_new_message(message)
 
     async def send_message(self, message: ChatMessage):
-        await self.channel.send_message(self.settings.reporter or message.chat_id, message)
+        message.receiver = self.settings.forward_to
+        await self.channel.send_message(message)
 
     async def _handle_sent_message(self, message: ChatMessage):
         _ = message

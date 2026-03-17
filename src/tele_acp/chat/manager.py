@@ -41,8 +41,14 @@ class ChatManager(Chatable):
 
     async def get_binding(self, channel_id: str, chat_id: str) -> ChatSettings:
         _ = chat_id
+
+        for binding in self._config.bindings:
+            if binding.channel != channel_id:
+                continue
+            return binding
+
         return ChatSettings(
             agent=DEFAULT_AGENT_ID,
             channel=channel_id,
-            reporter=None,
+            forward_to=None,
         )
