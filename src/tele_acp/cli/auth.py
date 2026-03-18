@@ -4,9 +4,8 @@ from typing import Annotated
 
 import typer
 from rich import print
-from telegram_channel import TelegramBotChannel, TelegramUserChannel, TGClient, TGSession, session_switch, format_me
+from telegram_channel import TelegramBotChannel, TelegramUserChannel, TGClient, TGSession, format_me, session_switch
 
-from tele_acp import utils
 from tele_acp.config import delete_channel_config, load_config, update_or_save_channel_config
 
 from .shared import SharedArgs
