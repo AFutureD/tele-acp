@@ -1,0 +1,17 @@
+[project]
+name = "telegram-channel"
+version = "0.1.0"
+description = "Telegram Channel implementation for tele-acp"
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic>=2.12.5",
+    "tele-acp-core>=0.1.0",
+    "telethon>=1.42.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.28,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = ["telegram_channel"]

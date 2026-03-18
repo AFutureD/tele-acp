@@ -1,50 +1,17 @@
 from __future__ import annotations
 
-import enum
 from pathlib import Path
-from typing import Self, TypeAlias
+from typing import Self
 
 import tomlkit
 from pydantic import BaseModel, ValidationError, model_validator
 from pydantic.fields import Field
 from tele_acp_core import DEFAULT_AGENT_ID, AgentConfig, ConfigError
+from telegram_channel import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TypeTelegramChannel
 from tomlkit.exceptions import TOMLKitError
 from tomlkit.items import Table
 
 from .shared import get_app_user_default_dir
-
-DEFAULT_TELEGRAM_API_ID = 611335
-DEFAULT_TELEGRAM_API_HASH = "d524b414d21f4d37f08684c1df41ac9c"
-
-
-class ChannelType(str, enum.Enum):
-    TELEGRAM_USER = "telegram_user"
-    TELEGRAM_BOT = "telegram_bot"
-
-
-class ChannelSettings(BaseModel):
-    type: ChannelType
-
-
-class TelegramChannel(ChannelSettings):
-    session_name: str = Field(description="The session name for the Telegram client")
-
-    whitelist: list[str] | None = Field(default=[], description="The list of allowed users. peer id or group id")
-
-
-class TelegramUserChannel(TelegramChannel):
-    type: ChannelType = ChannelType.TELEGRAM_USER
-
-    allow_contacts: bool = Field(default=True, description="Whether to allow contacts")
-
-
-class TelegramBotChannel(TelegramChannel):
-    type: ChannelType = ChannelType.TELEGRAM_BOT
-
-    token: str = Field(description="Telegram bot token")
-
-
-TypeTelegramChannel: TypeAlias = TelegramUserChannel | TelegramBotChannel
 
 
 class ChatSettings(BaseModel):
@@ -77,7 +44,7 @@ def get_config_default_path() -> Path:
 
 
 def get_config_default() -> Config:
-    return Config(api_id=611335, api_hash="d524b414d21f4d37f08684c1df41ac9c")
+    return Config(api_id=DEFAULT_TELEGRAM_API_ID, api_hash=DEFAULT_TELEGRAM_API_HASH)
 
 
 def load_config(config_file: Path | None = None) -> Config:

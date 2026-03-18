@@ -6,10 +6,10 @@ from typing import Annotated
 
 import typer
 from rich import print
+from telegram_channel import TGClient, format_me
 
 from tele_acp.config import load_config
 from tele_acp.constant import VERSION
-from tele_acp.utils import fmt
 
 from .auth import auth_cli
 from .mainloop import mainloop
@@ -82,7 +82,6 @@ def main(
 @cli.command(name="me")
 def me_get(ctx: typer.Context) -> None:
     """Show the current authenticated Telegram account."""
-    from tele_acp.channel.client import TGClient
 
     cli_args: SharedArgs = ctx.obj
 
@@ -101,7 +100,7 @@ def me_get(ctx: typer.Context) -> None:
         if not me:
             return False
 
-        print(fmt.format_me(me))
+        print(format_me(me))
         return True
 
     ok = asyncio.run(_run())

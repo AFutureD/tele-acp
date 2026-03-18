@@ -2,8 +2,9 @@ import arrow
 import telethon
 from tele_acp_core import SessionInfo
 from telethon.tl.tlobject import _json_default
+from telethon.tl.types import TypeAuthorization
 
-from .output import get_str_len_for_int
+from tele_acp.utils.output import get_str_len_for_int
 
 
 def json_default_callback(value):
@@ -36,5 +37,6 @@ def format_authorizations(authorizations: telethon.types.account.Authorizations)
     max_hash_len = max(list(map(lambda x: get_str_len_for_int(x.hash), authorizations.authorizations)))
     max_device_model_len = max(list(map(lambda x: len(x.device_model), authorizations.authorizations)))
 
-    rows = [_format_authorization_to_str(item, max_hash_len, max_device_model_len) for item in authorizations.authorizations]
+    auths: list[TypeAuthorization] = authorizations.authorizations
+    rows = [_format_authorization_to_str(item, max_hash_len, max_device_model_len) for item in auths]
     return "\n".join(rows)

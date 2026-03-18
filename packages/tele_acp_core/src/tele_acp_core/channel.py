@@ -2,9 +2,17 @@ import contextlib
 from abc import abstractmethod
 from typing import Any, AsyncIterator, Protocol, TypeAlias
 
+from pydantic import BaseModel
+
 from .chat import ChatMessage
 
 ChannelPeer: TypeAlias = Any
+
+ChannelType: TypeAlias = str
+
+
+class ChannelSettings(BaseModel):
+    type: ChannelType
 
 
 class Channel(Protocol):

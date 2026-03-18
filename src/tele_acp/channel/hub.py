@@ -4,11 +4,10 @@ import logging
 from typing import AsyncIterator
 
 from tele_acp_core import Channel, ChatMessage
+from telegram_channel import TelegramChannel
 
 from tele_acp.config import Config
 from tele_acp.router import Router
-
-from .telegram import TelegramChannel
 
 
 class ChannelHub:
@@ -21,7 +20,7 @@ class ChannelHub:
         self._channels: dict[str, Channel] = {}
 
         for channel_id, channel_settings in self._config.channels.items():
-            channel = TelegramChannel(channel_id, channel_settings, self._on_receive_new_message)
+            channel = TelegramChannel(channel_id, self._config.api_id, self._config.api_hash, channel_settings, self._on_receive_new_message)
             self._channels[channel.id] = channel
 
     def set_router(self, router: Router) -> None:

@@ -4,11 +4,10 @@ from typing import Annotated
 
 import typer
 from rich import print
+from telegram_channel import TelegramBotChannel, TelegramUserChannel, TGClient, TGSession, session_switch, format_me
 
 from tele_acp import utils
-from tele_acp.channel.client import TGClient
-from tele_acp.config import TelegramBotChannel, TelegramUserChannel, delete_channel_config, load_config, update_or_save_channel_config
-from tele_acp.session import TGSession, session_switch
+from tele_acp.config import delete_channel_config, load_config, update_or_save_channel_config
 
 from .shared import SharedArgs
 
@@ -103,7 +102,7 @@ def auth_login(
 
         update_or_save_channel_config(id, channel=channel, config_file=cli_args.config_file)
 
-        print(f"Hi {utils.fmt.format_me(me)}")
+        print(f"Hi {format_me(me)}")
         return True
 
     ok = asyncio.run(_run())
@@ -135,7 +134,7 @@ def auth_logout(ctx: typer.Context):
         delete_channel_config(session_name=session_name, config_file=cli_args.config_file)
 
         if me:
-            print(f"Bye {utils.fmt.format_me(me)}")
+            print(f"Bye {format_me(me)}")
         return True
 
     ok = asyncio.run(_run())

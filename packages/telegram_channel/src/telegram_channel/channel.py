@@ -8,13 +8,13 @@ from tele_acp_core import (
     ChatMessage,
     ChatMessageFilePart,
     ChatMessagePart,
-    ChatMessageTextPart, unreachable,
+    ChatMessageTextPart,
+    unreachable,
 )
 from telethon.tl.custom import Message as TeleMessage
 
-from tele_acp.config import TelegramUserChannel, TypeTelegramChannel
-
 from .client import TGClient
+from .settings import TelegramUserChannel, TypeTelegramChannel
 
 
 def peer_id_into_raw_int(peer_id: telethon.types.TypePeer) -> int:
@@ -80,8 +80,10 @@ class TelegramChannel(Channel):
     屏蔽 telethon 对 APP 的细节
     """
 
-    def __init__(self, id: str, settings: TypeTelegramChannel, message_handler: Callable[[ChatMessage], Awaitable[None]]):
-        tele_client = TGClient.create_as_login(None, None, settings)
+    def __init__(
+        self, id: str, api_id: int | None, api_hash: str | None, settings: TypeTelegramChannel, message_handler: Callable[[ChatMessage], Awaitable[None]]
+    ):
+        tele_client = TGClient.create_as_login(api_id, api_hash, settings)
         tele_client.add_event_handler(self._on_receive_new_message_event, telethon.events.NewMessage())
         self.settings = settings
         self._tele_client = tele_client

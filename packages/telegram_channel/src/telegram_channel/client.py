@@ -5,7 +5,7 @@ import typing
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Protocol, cast
+from typing import Callable, cast
 
 import telethon
 from tele_acp_core import SessionInfo
@@ -16,40 +16,12 @@ from telethon.tl.functions.account import GetAuthorizationsRequest
 from telethon.tl.types.contacts import Contacts
 from telethon.types import PeerUser
 
-from tele_acp.config import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TypeTelegramChannel
-from tele_acp.session import TGSession, load_session, session_ensure_current_valid
-from tele_acp.utils.fmt import format_me
+from .fmt import format_me
+from .session import TGSession, load_session, session_ensure_current_valid
+from .settings import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TypeTelegramChannel
 
 
-class TGActionProvider(Protocol):
-    def with_action(self, peer: telethon.types.TypePeer, action: str) -> AbstractAsyncContextManager[object]: ...
-    async def send_message(
-        self,
-        entity: hints.EntityLike,
-        message: hints.MessageLike = "",
-        *,
-        reply_to: None | int | telethon.types.Message = None,
-        attributes: list[telethon.types.TypeDocumentAttribute] | None = None,
-        parse_mode: str | None = None,
-        formatting_entities: None | typing.List[telethon.types.TypeMessageEntity] = None,
-        link_preview: bool = True,
-        file: hints.FileLike | list[hints.FileLike] | None = None,
-        thumb: hints.FileLike | None = None,
-        force_document: bool = False,
-        clear_draft: bool = False,
-        buttons: hints.MarkupLike | None = None,
-        silent: bool | None = None,
-        background: bool | None = None,
-        supports_streaming: bool = False,
-        schedule: "hints.DateLike" = None,
-        comment_to: int | telethon.types.Message | None = None,
-        nosound_video: bool | None = None,
-        send_as: hints.EntityLike | None = None,
-        message_effect_id: int | None = None,
-    ) -> telethon.types.Message: ...
-
-
-class TGClient(telethon.TelegramClient, TGActionProvider):
+class TGClient(telethon.TelegramClient):
     @staticmethod
     def create_simple(api_id: int | None, api_hash: str | None, session_name: str | None, with_current: bool = True) -> TGClient:
         api_id = api_id or DEFAULT_TELEGRAM_API_ID
@@ -262,7 +234,7 @@ class TGClient(telethon.TelegramClient, TGActionProvider):
         else:
             ret = messages
 
-        return ret
+        return ret  # ty:ignore[invalid-return-type]
 
     async def list_messages(
         self,
@@ -313,7 +285,7 @@ class TGClient(telethon.TelegramClient, TGActionProvider):
         return messages
 
     async def get_contacts(self) -> Contacts:
-        contacts: Contacts = await self(functions.contacts.GetContactsRequest(0))  # type: ignore
+        contacts: Contacts = await self(functions.contacts.GetContactsRequest(0))
         return contacts
 
     async def get_contact_user_peer(self) -> list[PeerUser]:
