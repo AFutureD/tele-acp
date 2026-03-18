@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import cast
+from typing import Tuple, cast
 
 from mcp.server.fastmcp import Context, FastMCP
 from tele_acp_core import ChatMessage, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart
@@ -122,10 +122,22 @@ async def list_messages(
         A list of messages.
     """
 
+    chat = await cast(MCP, ctx.fastmcp).get_chat(channel_id, chat_id)
+
+    date_from, date_to = _date_range(date_start=date_start, date_end=date_end, date_range=date_range)
+
+    await ctx.info(f"Listing messages: channel_id={channel_id}, chat_id={chat_id}, num={num}, date_from={date_from}, date_to={date_to}")
+    messages = await chat.list_messages(num=num, date_start=date_from, date_end=date_to)
+    return messages
+
+
+def _date_range(
+    date_start: str | None = None,
+    date_end: str | None = None,
+    date_range: str | None = None,
+) -> Tuple[datetime | None, datetime | None]:
     import dateparser
     from dateparser.search import search_dates
-
-    chat = await cast(MCP, ctx.fastmcp).get_chat(channel_id, chat_id)
 
     date_from: datetime | None = None
     if date_start:
@@ -144,7 +156,11 @@ async def list_messages(
         date_span = [start_date, start_date + timedelta(days=6)]
     elif date_range:
         dates = search_dates(date_range, settings={"RETURN_TIME_SPAN": True}) or []
-        if len(dates) == 2:
+        if len(dates) == 1:
+            date = dates[0][1]  # get value from tuple
+            date_from = date.replace(hour=0, minute=0, second=0, microsecond=0)
+            date_to = date_from + timedelta(days=1) - timedelta(seconds=1)
+        elif len(dates) == 2:
             # https://github.com/scrapinghub/dateparser/blob/cd5f226454e0ed3fe93164e7eff55b00f57e57c7/dateparser/search/search.py#L202
             start = next((x for (s, x) in dates if "start" in s), None)
             end = next((x for (s, x) in dates if "end" in s), None)
@@ -155,5 +171,4 @@ async def list_messages(
         date_from = date_span[0]
         date_to = date_span[1]
 
-    messages = await chat.list_messages(num=num, date_start=date_from, date_end=date_to)
-    return messages
+    return date_from, date_to

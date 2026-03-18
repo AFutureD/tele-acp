@@ -1,5 +1,6 @@
 import contextlib
 import logging
+from datetime import datetime
 from typing import AsyncIterator, Awaitable, Callable
 
 import telethon
@@ -61,10 +62,11 @@ def chat_id_into_peer_id(chat_id: str) -> telethon.types.TypePeer | str:
 
 def convert_telegram_message_to_chat_message(
     channel_id: str,
-    chat_id: str,
     message: TeleMessage,
     lifespan: contextlib.AbstractAsyncContextManager | None = None,
 ) -> ChatMessage:
+    chat_id: str = peer_id_into_chat_id(message.peer_id)
+
     message_id = str(message.id)
 
     text_part: str | None = message.message
@@ -131,8 +133,7 @@ class TelegramChannel(Channel):
         if not isinstance(peer_id, telethon.types.PeerUser):  # hard-coded peer filter used during development
             return
 
-        chat_id: str = peer_id_into_chat_id(peer_id)
-        chat_message = convert_telegram_message_to_chat_message(self.id, chat_id, message, lifespan=self.build_message_lifespan(peer_id, message.id))
+        chat_message = convert_telegram_message_to_chat_message(self.id, message, lifespan=self.build_message_lifespan(peer_id, message.id))
         await self.receive_message(chat_message)
 
     @contextlib.asynccontextmanager
@@ -191,3 +192,9 @@ class TelegramChannel(Channel):
         match_contact_list = await _is_allowed_by_contact(self.settings)
 
         return match_white_list or match_contact_list
+
+    async def list_messages(self, chat_id: str, num: int = 1, date_start: datetime | None = None, date_end: datetime | None = None) -> list[ChatMessage]:
+        peer_id = chat_id_into_peer_id(chat_id)
+        messages = await self._tele_client.list_messages(peer_id, date_start=date_start, date_end=date_end, limit=num)
+
+        return [convert_telegram_message_to_chat_message(channel_id=self.id, message=message) for message in messages]

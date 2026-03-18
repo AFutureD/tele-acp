@@ -1,5 +1,6 @@
 import contextlib
 from abc import abstractmethod
+from datetime import datetime
 from typing import Any, AsyncIterator, Protocol, TypeAlias
 
 from pydantic import BaseModel
@@ -39,3 +40,6 @@ class Channel(Protocol):
     async def status(self) -> bool:
         """Channel Status"""
         ...
+
+    @abstractmethod
+    async def list_messages(self, chat_id: str, num: int = 1, date_start: datetime | None = None, date_end: datetime | None = None) -> list[ChatMessage]: ...

@@ -4,6 +4,7 @@ from typing import Any, Protocol, TypeAlias
 
 from pydantic import ConfigDict, Field
 from pydantic.dataclasses import dataclass
+from pydantic.json_schema import SkipJsonSchema
 
 
 @dataclass
@@ -35,7 +36,7 @@ class ChatMessage:
 
     parts: list[ChatMessagePart] = Field(default_factory=list, description="The Message. Ordered.")
 
-    lifespan: contextlib.AbstractAsyncContextManager | None = Field(default=None, exclude=True)
+    lifespan: SkipJsonSchema[contextlib.AbstractAsyncContextManager | None] = Field(default=None, exclude=True)
 
     meta: dict[str, Any] = Field(default_factory=dict, description="Metadata for the message")
 
