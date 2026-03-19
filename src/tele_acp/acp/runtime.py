@@ -69,6 +69,10 @@ class ACPAgentRuntime(ACPAgentConnection):
 
     # MARK: Prompt
 
+    @property
+    async def is_active(self) -> bool:
+        return self._update_queue is not None
+
     async def prompt(self, parts: list[str]) -> AsyncIterator[AcpMessage]:
         session = await self.session
 
@@ -123,6 +127,13 @@ class ACPAgentRuntime(ACPAgentConnection):
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+
+    async def cancel(self):
+        if not self.is_active:
+            return
+
+        session = await self.session
+        await self.connction.cancel(session.session_id)
 
     async def _handle_session_update(self, session_id: str, update: ACPUpdateChunk) -> None:
         queue = self._update_queue

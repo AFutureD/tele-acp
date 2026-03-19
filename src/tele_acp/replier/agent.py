@@ -1,10 +1,30 @@
 import logging
 from typing import AsyncIterator
 
+import jinja2
 from tele_acp_core import AgentConfig, Chatable, ChatMessage, ChatMessagePart, ChatMessageReplyable, ChatMessageTextPart
 
 from tele_acp.acp import ACPAgentRuntime, AcpMessage
 from tele_acp.constant import SUSIE_MCP_NAME
+
+PROMPT = (
+    # IMPORTANT. We may move to system instructions but the acp do not support this.
+    "<IMPORTANT>\n"
+    f"always using `{SUSIE_MCP_NAME}` tools when you need to operate on Telegram.\n"
+    "always pass `channel_id={{channel_id}}` to every tool call.\n"
+    "If you want to reply to the message, always call `send_message`, and you may call it multiple times.\n"
+    "</IMPORTANT>\n"
+    "\n"
+    # Context Info
+    "<CONTEXT>\n"
+    "Channel ID: {{channel_id}}\n"
+    "Chat ID: {{chat_id}}\n"
+    "</CONTEXT>\n"
+    "\n"
+    # User Input
+    "User Content:\n"
+    "{{content}}"
+)
 
 
 def convert_acp_message_to_chat_message(channel_id: str, chat_id: str, message: AcpMessage) -> ChatMessage:
@@ -20,46 +40,32 @@ class AgentThread:
         self._acp_runtime = acp_runtime
         self.logger = logging.getLogger(__name__)
 
-    async def stop_and_send_message(self, channel_id, chat_id, content: str) -> AsyncIterator[AcpMessage]:
-
-        prompt = (
-            # IMPORTANT. We may move to system instructions but the acp do not support this.
-            f"<IMPORTANT>\n"
-            f"always using `{SUSIE_MCP_NAME}` tools when you need to operate on Telegram.\n"
-            f"always pass `channel_id={channel_id}` to every tool call.\n"
-            f"If you want to reply to the message, always call `send_message`, and you may call it multiple times.\n"
-            f"</IMPORTANT>\n"
-            f"\n"
-            # Context Info
-            f"<CONTEXT>\n"
-            f"Channel ID: {channel_id}\n"
-            f"Chat ID: {chat_id}\n"
-            f"</CONTEXT>\n"
-            f"\n"
-            # User Input
-            f"User Content:\n"
-            f"{content}"
-        )
-
-        async for item in self._acp_runtime.prompt([prompt]):
-            yield item
-
 
 class ChatReplier(AgentThread, ChatMessageReplyable):
     async def receive_message(self, chat: Chatable, message: ChatMessage) -> None:
         channel_id = message.channel_id
         chat_id = message.chat_id
 
-        content = next((x for x in message.parts if isinstance(x, ChatMessageTextPart)), None)
-        if content is None:
+        text_part = next((x for x in message.parts if isinstance(x, ChatMessageTextPart)), None)
+        if text_part is None:
             return
 
-        self.logger.info(content)
-        stream: AsyncIterator[AcpMessage] = self.stop_and_send_message(channel_id, chat_id, content.text)
+        template = jinja2.Template(PROMPT)
+        content = template.render(channel_id=channel_id, chat_id=chat_id, content=text_part.text)
+        prompt = [content]
+
+        self.logger.info(prompt)
+
+        # force cancel previous prompt turn
+        await self._acp_runtime.cancel()  # TODO: check time delta
+
+        # start prompt request
+        stream: AsyncIterator[AcpMessage] = self._acp_runtime.prompt(prompt)
         async for delta in stream:
             if (stop_reason := delta.stop_reason) and stop_reason != "cancelled":
                 msg = convert_acp_message_to_chat_message(message.channel_id, message.chat_id, delta)
                 if (forward_to := self.settings.forward_to) and forward_to != "":
                     msg.receiver = forward_to
                 await chat.send_message(msg)
+
         self.logger.info("Message sent for peer: %s", message.channel_id)
