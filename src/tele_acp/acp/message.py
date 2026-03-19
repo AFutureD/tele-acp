@@ -111,6 +111,6 @@ class AcpMessage(BaseModel):
                 content = _description_tool(temp_part)  # type: ignore
                 if content != "":
                     description += "\n"
-                    description += content  # type: ignore
+                    description += content
 
         return description

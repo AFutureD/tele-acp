@@ -58,15 +58,19 @@ Your job is trying to add documents in this swift package project.
 - `README.md` the basic inforamtion about this project.
 - `AGENTS.md` the instructions for agents like codex.
 - `docs` the sub doc file, the most them are used for agents.
-- `src` the source code 
-  - `tele_acp` the main module
-  - `tele_acp/cli` the cli entrypoint
-  - `tele_acp/acp` the implementation of the ACP client protocol adapter
-  - `tele_acp/agent` the per-dialog agent runtime and thread abstraction
-  - `tele_acp/app` the application bootstrap and Telegram event dispatch
-  - `tele_acp/mcp` the local MCP server exposed to ACP agents
-  - `tele_acp/types` the shared pydantic models and domain types
-  - `tele_acp/utils` the output, formatting, and helper utilities
+- `packages` the packages:
+  - `tele_acp_core` the data model and protocol 
+  - `telegram_channel` the channel implementation for telegram
+- `src/tele_acp` the source code 
+  - `cli` the cli entrypoint
+  - `app` the application bootstrap
+  - `acp` the implementation of the ACP client protocol
+  - `mcp` the local MCP server exposed to ACP agents
+  - `channel` the channel hub where contonls all message income and outcome
+  - `chat` the chat
+  - `replier` the replier that reply to the income message.
+  - `config` the applicatoin configuration settings
+  - `utils` the output, formatting, and helper utilities
 
 
 ## 0x03. Versioning
@@ -83,5 +87,5 @@ Examples:
 To list all TODOs that embeded in code files.
 
 ```bash
-rg --trim "// ?TODO" [PATH ...]
+rg --trim "# ?TODO" [PATH ...]
 ```
