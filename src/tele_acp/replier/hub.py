@@ -1,15 +1,17 @@
 from tele_acp_core import AgentConfig, ChatMessageReplyable
 
 from tele_acp.acp.runtime import ACPRuntimeHub
+from tele_acp.command import CommandCenter
 from tele_acp.config import Config
 
 from .agent import AgentReplier
 
 
 class ChatReplierHub:
-    def __init__(self, config: Config, acp_hub: ACPRuntimeHub) -> None:
+    def __init__(self, config: Config, acp_hub: ACPRuntimeHub, command_center: CommandCenter) -> None:
         self._config = config
         self._acp_hub = acp_hub
+        self._command_center = command_center
 
         self.settings: dict[str, AgentConfig] = {agent.id: agent for agent in config.agents}
 
