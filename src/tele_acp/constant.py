@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import importlib
+import importlib.metadata
 
 NAME = "susie"
 VERSION = importlib.metadata.version("tele-acp")
