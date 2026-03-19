@@ -2,12 +2,12 @@ import logging
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from pathlib import Path
 
-from .constant import APP_NAME
+from .constant import NAME
 
 log_dir = Path("./logs/")
 log_dir.mkdir(parents=True, exist_ok=True)
 
-log_hander = TimedRotatingFileHandler(log_dir / f"{APP_NAME}.log", when="midnight")
+log_hander = TimedRotatingFileHandler(log_dir / f"{NAME}.log", when="midnight")
 log_hander.setLevel(logging.INFO)
 
 error_handler = RotatingFileHandler(log_dir / "error.log")

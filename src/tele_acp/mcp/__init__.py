@@ -8,10 +8,13 @@ from tele_acp_core import ChatInfo, ChatMessage, ChatMessageFilePart, ChatMessag
 
 from tele_acp.chat import Chat, ChatManager
 
+NAME = "susie_mcp_server"
+PORT = 9898
+
 
 class MCP(FastMCP):
     def __init__(self):
-        super().__init__(name="telegram_mcp_server", json_response=True, port=9998)
+        super().__init__(name=NAME, json_response=True, port=PORT)
         self._chat_manager: ChatManager | None = None
 
     @property

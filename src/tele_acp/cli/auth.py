@@ -18,6 +18,35 @@ auth_cli = typer.Typer(
 )
 
 
+@auth_cli.command(name="me")
+def me_get(ctx: typer.Context) -> None:
+    """Show the current authenticated Telegram account."""
+
+    cli_args: SharedArgs = ctx.obj
+
+    async def _run() -> bool:
+        config = load_config(config_file=cli_args.config_file)
+        tele_client = TGClient.create_simple(
+            config.api_id,
+            config.api_hash,
+            cli_args.session,
+            with_current=False,
+        )
+
+        async with tele_client as tg:
+            me = await tg.get_user()
+
+        if not me:
+            return False
+
+        print(format_me(me))
+        return True
+
+    ok = asyncio.run(_run())
+    if not ok:
+        raise typer.Exit(code=1)
+
+
 @auth_cli.command(
     name="login",
     help="""

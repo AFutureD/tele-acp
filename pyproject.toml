@@ -53,7 +53,7 @@ tele-acp-core = { workspace = true }
 telegram-channel = { workspace = true }
 
 [project.scripts]
-tele = "tele_acp.cli:cli"
+susie = "tele_acp.cli:cli"
 
 [tool.ruff]
 line-length = 160

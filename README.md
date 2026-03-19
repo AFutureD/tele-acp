@@ -1,15 +1,11 @@
-# tele-acp
+# susie
 
+> The project is named after *Susie* from *Lord of the Mysteries*.  
+> She is Audrey’s golden retriever, as well as her friend and trusted assistant.  
+> See https://lordofthemysteries.fandom.com/wiki/Susie for more details.
 
-An `APP` have to main class `AgentRuntimeManager` and "ChannelGateway"
+**Chat with agents on Telegram through ACP.**
 
-A ChannelGateway can have multiple Channel
-A Channel may be a Telegram_User or Telegram_Bot.
-A Channel have multiple Dialog
+This project was designed to let agents handle Telegram user requests on my behalf through my personal account rather than via a bot.
 
-A AgentRuntimeManager may have multiple AgentSettings
-A AgentSettings may have mutiple AgentRuntime 
-
-A Dialog have A AgentRuntime, connect via inbound and outbound.
-Dialog -> AgentRuntime: InobundMessage
-Dialog -> AgentRuntime: OutboundMessage
+## Quick Start

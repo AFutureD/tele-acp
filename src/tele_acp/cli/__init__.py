@@ -5,10 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich import print
-from telegram_channel import TGClient, format_me
 
-from tele_acp.config import load_config
 from tele_acp.constant import VERSION
 
 from .auth import auth_cli
@@ -21,12 +18,14 @@ cli = typer.Typer(
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
     help="""
-    The Telegram CLI.
+    Tele-ACP
+
+    Chat with agents on Telegram through ACP.
 
     Quick Start:
 
     1. tele auth login
-    2. tele me
+    2. tele auth me
     3. tele dialog list
     4. tele message list <dialog_id> -n 20
 
@@ -77,35 +76,6 @@ def main(
     _ = version
 
     ctx.obj = SharedArgs(config_file=config_file, session=session)
-
-
-@cli.command(name="me")
-def me_get(ctx: typer.Context) -> None:
-    """Show the current authenticated Telegram account."""
-
-    cli_args: SharedArgs = ctx.obj
-
-    async def _run() -> bool:
-        config = load_config(config_file=cli_args.config_file)
-        tele_client = TGClient.create_simple(
-            config.api_id,
-            config.api_hash,
-            cli_args.session,
-            with_current=False,
-        )
-
-        async with tele_client as tg:
-            me = await tg.get_user()
-
-        if not me:
-            return False
-
-        print(format_me(me))
-        return True
-
-    ok = asyncio.run(_run())
-    if not ok:
-        raise typer.Exit(code=1)
 
 
 @cli.command(name="start")

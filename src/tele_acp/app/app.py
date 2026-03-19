@@ -13,10 +13,10 @@ from tele_acp.router import Router
 
 class APP:
     def __init__(self, config: Config):
-        from tele_acp.mcp import MCP, mcp_server
+        from tele_acp.mcp import MCP, NAME, mcp_server
 
         builtin_mcp = acp.schema.HttpMcpServer(
-            name="telegram_mcp_server",  # https://github.com/zed-industries/codex-acp/issues/55
+            name=NAME,  # https://github.com/zed-industries/codex-acp/issues/55
             url=mcp_server.mcp_url,
             headers=[],
             type="http",
