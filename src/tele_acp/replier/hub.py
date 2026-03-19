@@ -13,10 +13,10 @@ class ChatReplierHub:
 
         self.settings: dict[str, AgentConfig] = {agent.id: agent for agent in config.agents}
 
-    async def spawn_replier(self, agent_id: str) -> ChatMessageReplyable | None:
+    async def spawn_replier(self, agent_id: str) -> ChatMessageReplyable:
         agent_settings = self.settings.get(agent_id)
         if agent_settings is None:
-            return None
+            raise RuntimeError(f"agent not found for id: {agent_id}")
 
         runtime = await self._acp_hub.build_acp_runtime(agent_settings)
         replier = AgentReplier(agent_settings, runtime)

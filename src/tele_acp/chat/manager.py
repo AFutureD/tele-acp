@@ -24,9 +24,7 @@ class ChatManager(Chatable):
         await chat.receive_message(message)
 
     async def list_chat_infos(self, channel_id: str, with_archived: bool = False) -> list[ChatInfo]:
-        channel = self._channel_hub.get_channel(channel_id)
-        assert channel is not None, "channel not found"
-
+        channel = self._channel_hub.require_channel(channel_id)
         return await channel.list_chats(with_archived)
 
     async def get_chat(self, channel_id: str, chat_id: str) -> Chat:
@@ -34,12 +32,8 @@ class ChatManager(Chatable):
             return chat
 
         binding = await self.get_binding(channel_id, chat_id)
-
-        channel = self._channel_hub.get_channel(channel_id)
-        assert channel is not None, "channel not found"
-
+        channel = self._channel_hub.require_channel(channel_id)
         replier = await self._replier_hub.spawn_replier(binding.agent)
-        assert replier is not None, "agent not found"
 
         chat = Chat(chat_id, channel, binding, replier)
 

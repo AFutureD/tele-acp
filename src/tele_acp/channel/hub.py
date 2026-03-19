@@ -29,6 +29,12 @@ class ChannelHub:
     def get_channel(self, channel_id: str) -> Channel | None:
         return self._channels.get(channel_id)
 
+    def require_channel(self, channel_id: str) -> Channel:
+        channel = self.get_channel(channel_id)
+        if channel is None:
+            raise RuntimeError(f"channel not found for id: {channel_id}")
+        return channel
+
     @contextlib.asynccontextmanager
     async def run(self) -> AsyncIterator[ChannelHub]:
         assert len(self._channels) != 0, "No channels configured"
