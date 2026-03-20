@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import AsyncIterator, Awaitable, Callable
 
 import telethon
+import telethon.hints
 from tele_acp_core import Channel, ChatInfo, ChatMessage, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart, unreachable
 from telethon.tl.custom import Message as TeleMessage
 from telethon.tl.custom.dialog import Dialog as TeleDialog
