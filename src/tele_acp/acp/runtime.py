@@ -70,7 +70,7 @@ class ACPAgentRuntime(ACPAgentConnection):
     # MARK: Prompt
 
     @property
-    async def is_active(self) -> bool:
+    def is_active(self) -> bool:
         return self._update_queue is not None
 
     async def prompt(self, parts: list[str]) -> AsyncIterator[AcpMessage]:
