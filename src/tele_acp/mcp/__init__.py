@@ -28,7 +28,7 @@ class MCP(FastMCP):
         self._chat_manager = chat_manager
 
     async def get_chat(self, channel_id: str, chat_id: str) -> Chat:
-        chat = await self.chat_manager.get_chat(channel_id, chat_id)
+        chat = await self.chat_manager.require_chat(channel_id, chat_id)
         return chat
 
 

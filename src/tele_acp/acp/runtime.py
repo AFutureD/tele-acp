@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import logging
+import uuid
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -32,6 +33,7 @@ class ACPAgentRuntime(ACPAgentConnection):
 
     def __init__(
         self,
+        id: str,
         agent_config: ACPAgentConfig,
         cwd: str | Path | None = None,
         mcp_servers: list[acp.schema.HttpMcpServer | acp.schema.SseMcpServer | acp.schema.McpServerStdio] | None = None,
@@ -42,6 +44,7 @@ class ACPAgentRuntime(ACPAgentConnection):
 
         super().__init__(agent_config, cwd, mcp_servers, self._handle_session_update)
 
+        self.id = id
         self._session: acp.NewSessionResponse | None = None
 
     # MARK: Session
@@ -159,6 +162,7 @@ class ACPRuntimeHub:
         self._config = config
         self._stack: contextlib.AsyncExitStack | None = None
         self._mcp_servers = mcp_servers
+        self._runtimes: dict[str, ACPAgentRuntime] = {}
 
     async def build_acp_runtime(self, agent: AgentConfig) -> ACPAgentRuntime:
         assert self._stack is not None
@@ -166,8 +170,10 @@ class ACPRuntimeHub:
         acp_config = self.get_acp_config(agent.acp_id)
         assert acp_config is not None, "acp agent not found"
 
-        runtime = ACPAgentRuntime(acp_config, cwd=agent.work_dir or get_agent_work_dir(agent.id), mcp_servers=self._mcp_servers)
+        id = str(uuid.uuid4())
+        runtime = ACPAgentRuntime(id, acp_config, cwd=agent.work_dir or get_agent_work_dir(agent.id), mcp_servers=self._mcp_servers)
         await self._stack.enter_async_context(runtime)
+        self._runtimes[id] = runtime
 
         return runtime
 
@@ -182,6 +188,9 @@ class ACPRuntimeHub:
         }
 
         return _acp_agents.get(agent_id)
+
+    def get_runtime(self, id: str) -> ACPAgentRuntime | None:
+        return self._runtimes.get(id)
 
     @contextlib.asynccontextmanager
     async def run(self) -> AsyncIterator[ACPRuntimeHub]:

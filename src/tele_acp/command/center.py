@@ -64,9 +64,10 @@ class CommandInfo(BaseModel):
 
 
 class CommandCenter(CommandExecutable):
-    def __init__(self) -> None:
+    def __init__(self, chain_to: CommandCenter | None = None) -> None:
         self._registered_commands: dict[str, CommandInfo] = {}
         self.register_command(self.show_help, name="help", description="show help message")
+        # TODO: handle chain_to
 
     def get_command(self, name: str) -> CommandInfo | None:
         return self._registered_commands.get(name)

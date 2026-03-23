@@ -83,7 +83,7 @@ class ChatMessageQueryable(Protocol):
 
 
 class ChatReplyable(Protocol):
-    async def receive_message(self, chat: Chatable, message: ChatMessage) -> bool:
+    async def receive_message(self, chat: Chatable, message: ChatMessage):
         """
         Handle messages sent by remote peer, and reply to the chat if needed.
         Args:

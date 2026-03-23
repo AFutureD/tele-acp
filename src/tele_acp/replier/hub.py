@@ -5,7 +5,6 @@ from tele_acp.command import CommandCenter
 from tele_acp.config import Config
 
 from .agent import AgentReplier
-from .command import CommandReplier
 from .compose import ComposedReplier
 
 
@@ -23,9 +22,7 @@ class ChatReplierHub:
             raise RuntimeError(f"agent not found for id: {agent_id}")
 
         runtime = await self._acp_hub.build_acp_runtime(agent_settings)
-        agent_replier = AgentReplier(agent_settings, runtime)
+        agent_replier = AgentReplier(agent_settings, runtime, self._command_center)
 
-        command_replier = CommandReplier(self._command_center)
-
-        replier = ComposedReplier(command_replier, agent_replier)
+        replier = ComposedReplier(agent_replier)
         return replier

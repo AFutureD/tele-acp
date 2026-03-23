@@ -16,18 +16,21 @@ class ChatManager(Chatable):
         self._chats: dict[str, Chat] = {}
 
     async def send_message(self, message: ChatMessage):
-        chat = await self.get_chat(message.channel_id, message.chat_id)
+        chat = await self.require_chat(message.channel_id, message.chat_id)
         await chat.send_message(message)
 
     async def receive_message(self, message: ChatMessage):
-        chat = await self.get_chat(message.channel_id, message.chat_id)
+        chat = await self.require_chat(message.channel_id, message.chat_id)
         await chat.receive_message(message)
 
     async def list_chat_infos(self, channel_id: str, with_archived: bool = False) -> list[ChatInfo]:
         channel = self._channel_hub.require_channel(channel_id)
         return await channel.list_chats(with_archived)
 
-    async def get_chat(self, channel_id: str, chat_id: str) -> Chat:
+    def get_chat(self, channel_id: str, chat_id: str) -> Chat | None:
+        return self._chats.get(chat_id)
+
+    async def require_chat(self, channel_id: str, chat_id: str) -> Chat:
         if chat := self._chats.get(chat_id):
             return chat
 
@@ -54,9 +57,4 @@ class ChatManager(Chatable):
         )
 
     def get_commands(self) -> list[Command]:
-        return [
-            Command(fn=self.echo, name="echo", description="echo message"),
-        ]
-
-    def echo(self, message: str) -> str:
-        return message
+        return []
