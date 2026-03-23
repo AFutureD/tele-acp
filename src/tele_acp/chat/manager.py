@@ -1,4 +1,4 @@
-from tele_acp_core import DEFAULT_AGENT_ID, Chatable, ChatInfo, ChatMessage
+from tele_acp_core import DEFAULT_AGENT_ID, Chatable, ChatInfo, ChatMessage, Command
 
 from tele_acp.channel.hub import ChannelHub
 from tele_acp.config import ChatSettings, Config
@@ -53,5 +53,10 @@ class ChatManager(Chatable):
             channel=channel_id,
         )
 
-    def get_commands(self) -> list[str]:
-        return []
+    def get_commands(self) -> list[Command]:
+        return [
+            Command(fn=self.echo, name="echo", description="echo message"),
+        ]
+
+    def echo(self, message: str) -> str:
+        return message

@@ -44,6 +44,10 @@ class ChatMessage:
     def Empty() -> ChatMessage:
         return ChatMessage(meta={}, id=None, channel_id="", chat_id="", receiver="", out=False, mute=False)
 
+    @staticmethod
+    def create_simple_text_message(channel_id: str, chat_id: str, text: str, receiver: str | None = None, out: bool = False, mute: bool = False) -> ChatMessage:
+        return ChatMessage(parts=[ChatMessageTextPart(text)], id=None, channel_id=channel_id, chat_id=chat_id, receiver=receiver, out=out, mute=mute)
+
 
 @dataclass
 class ChatInfo:

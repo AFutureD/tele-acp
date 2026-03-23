@@ -57,7 +57,7 @@ class CommandInfo(BaseModel):
     name: str
     description: str
     fn: AnyFunction
-    context_kwargs: dict[type, str] = None
+    context_kwargs: dict[type, str] = {}
 
     def __call__(self, *args) -> Any:
         return self.fn(*args)
@@ -87,10 +87,10 @@ class CommandCenter(CommandExecutable):
         context = Context(message=message)
 
         context_kwargs = {}
-        if name := command.context_kwargs[Context]:
-            context_kwargs[name] = context
-        if name := command.context_kwargs[ChatMessage]:
-            context_kwargs[name] = message
+        if param_name := command.context_kwargs.get(Context):
+            context_kwargs[param_name] = context
+        if param_name := command.context_kwargs.get(ChatMessage):
+            context_kwargs[param_name] = message
 
         result = command(*args, **context_kwargs)
         if inspect.isawaitable(result):
@@ -104,14 +104,15 @@ class CommandCenter(CommandExecutable):
 
         return decorator
 
-    def register(self, command: Command) -> CommandInfo:
-        return self.register_command(command.fn, name=command.name, description=command.description)
+    def register(self, command: Command, scope: str | None = None) -> CommandInfo:
+        return self.register_command(command.fn, name=command.name, description=command.description, scope=scope)
 
-    def register_command(self, fn: AnyFunction, *, name: str | None = None, description: str | None = None) -> CommandInfo:
-        command_name = name or fn.__name__  # ty:ignore[unresolved-attribute]
+    def register_command(self, fn: AnyFunction, *, name: str | None = None, description: str | None = None, scope: str | None = None) -> CommandInfo:
+        name = name or fn.__name__  # ty:ignore[unresolved-attribute]
         if name == "<lambda>":
             raise ValueError("You must provide a name for lambda functions")
 
+        command_name = f"{scope}.{name}" if scope else name
         if command_name in self._registered_commands:
             raise ValueError(f"command already registered: {command_name}")
 

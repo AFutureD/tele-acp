@@ -20,33 +20,40 @@ class CommandReplier(ChatReplyable):
         name, args = self.parse_command(command)
         if not await self._executor.can_execute(name):
             await chat.send_message(
-                ChatMessage(
-                    id=None,
+                ChatMessage.create_simple_text_message(
                     channel_id=message.channel_id,
                     chat_id=message.chat_id,
-                    receiver=None,
-                    out=False,
-                    mute=False,
-                    parts=[ChatMessageTextPart(f"Unknown command: {name}")],
+                    text=f"Unknown command: {name}",
                 )
             )
             return True
 
-        response = await self._executor.execute_command(name, *args, message=message)
-        if isinstance(response, str):
-            response_message = ChatMessage(
-                id=None,
-                channel_id=message.channel_id,
-                chat_id=message.chat_id,
-                receiver=None,
-                out=False,
-                mute=False,
-                parts=[ChatMessageTextPart(response)],
+        try:
+            response = await self._executor.execute_command(name, *args, message=message)
+            if isinstance(response, str):
+                await chat.send_message(
+                    ChatMessage.create_simple_text_message(
+                        channel_id=message.channel_id,
+                        chat_id=message.chat_id,
+                        text=response,
+                    )
+                )
+            elif isinstance(response, ChatMessage):
+                await chat.send_message(response)
+
+        except Exception as e:
+            await chat.send_message(
+                ChatMessage.create_simple_text_message(
+                    channel_id=message.channel_id,
+                    chat_id=message.chat_id,
+                    text=f"Error: {e}",
+                )
             )
-            await chat.send_message(response_message)
 
         return True
 
     def parse_command(self, command: str) -> tuple[str, list]:
-        name, *args = command.split()
+        import shlex
+
+        name, *args = shlex.split(command)
         return name, args

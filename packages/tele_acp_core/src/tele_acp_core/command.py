@@ -29,7 +29,7 @@ class Context(BaseModel):
 class CommandExecutable(Protocol):
     async def can_execute(self, name: str) -> bool: ...
 
-    async def execute_command(self, name: str, *args):
+    async def execute_command(self, name: str, *args, **kwargs) -> Any:
         """
         Perform the command with the given arguments.
         Notice it do not support kwargs for now.

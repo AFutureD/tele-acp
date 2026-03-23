@@ -8,7 +8,7 @@ from tele_acp.channel import ChannelHub
 from tele_acp.chat import ChatManager
 from tele_acp.command import command_center
 from tele_acp.config import Config
-from tele_acp.constant import SUSIE_MCP_NAME
+from tele_acp.constant import NAME, SUSIE_MCP_NAME
 from tele_acp.replier import ChatReplierHub
 from tele_acp.router import Router
 
@@ -44,7 +44,7 @@ class APP:
         mcp_server.set_chat_manager(chat_manager)
 
         for command in chat_manager.get_commands():
-            command_center.register(command)
+            command_center.register(command, scope=NAME)
 
         self._config = config
         self._chat_manager = chat_manager
