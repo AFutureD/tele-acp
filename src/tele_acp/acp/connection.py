@@ -33,7 +33,7 @@ class ACPAgentConnection:
         self._proc: object | None = None
 
     @property
-    def connction(self) -> acp.core.ClientSideConnection:
+    def connection(self) -> acp.core.ClientSideConnection:
         if self._conn is None:
             raise RuntimeError("ACP Connection is not available.")
         return self._conn

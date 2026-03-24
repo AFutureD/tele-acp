@@ -69,7 +69,7 @@ class ACPAgentRuntime(ACPAgentConnection):
             await self.cancel()
 
         try:
-            new_session = await self.connction.new_session(cwd=self._cwd, mcp_servers=self._mcp_servers)
+            new_session = await self.connection.new_session(cwd=self._cwd, mcp_servers=self._mcp_servers)
             session_id = new_session.session_id
 
             # TODO: [2026/03/24 <Huanan>] it will raise "Resource not found" from codex acp. do not know why.
@@ -100,7 +100,7 @@ class ACPAgentRuntime(ACPAgentConnection):
 
         async def turn_task() -> acp.PromptResponse:
             try:
-                ret = await self.connction.prompt(prompt=prompt, session_id=session_id)
+                ret = await self.connection.prompt(prompt=prompt, session_id=session_id)
                 return ret
             finally:
                 update_queue.shutdown()
@@ -148,7 +148,7 @@ class ACPAgentRuntime(ACPAgentConnection):
             return
 
         if session_id := self._session_id:
-            await self.connction.cancel(session_id)
+            await self.connection.cancel(session_id)
 
     async def _handle_session_update(self, session_id: str, update: ACPUpdateChunk) -> None:
         queue = self._update_queue
