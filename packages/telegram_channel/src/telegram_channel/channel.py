@@ -47,13 +47,22 @@ def chat_id_into_peer_id(chat_id: str) -> telethon.types.TypePeer | str:
     match type_str:
         case "U":
             return telethon.types.PeerUser(int(id_str))
-        case "C":
-            return telethon.types.PeerChat(int(id_str))
         case "G":
+            return telethon.types.PeerChat(int(id_str))
+        case "C":
             return telethon.types.PeerChannel(int(id_str))
         case _:
             return chat_id
 
+
+def parse_entity_from_text(text: str | None, entity: telethon.types.TypeMessageEntity) -> str | None:
+    if text is None or not hasattr(entity, "offset") or not hasattr(entity, "length"):
+        return None
+
+    entity_text = text.encode("utf-16-le")
+    entity_text = entity_text[entity.offset * 2: (entity.offset + entity.length) * 2]
+
+    return entity_text.decode("utf-16-le")
 
 def convert_telegram_message_to_chat_message(
     channel_id: str,
@@ -87,6 +96,7 @@ class TelegramChannel(Channel):
         self._message_handler = message_handler
         self._id = id
         self.logger = logging.getLogger(f"{self.__class__.__name__}:{self.id}")
+        self._cached_me: telethon.types.User | None = None
 
     @property
     def id(self) -> str:
@@ -96,10 +106,17 @@ class TelegramChannel(Channel):
     async def status(self) -> bool:
         return await self._tele_client.is_user_authorized()
 
+    def require_me(self) -> telethon.types.User:
+        if me := self._cached_me:
+            return me
+        raise ValueError("Not Found")
+
     @contextlib.asynccontextmanager
     async def run_until_finish(self) -> AsyncIterator[Channel]:
         async with contextlib.AsyncExitStack() as stack:
             await stack.enter_async_context(self._tele_client)
+            self._cached_me = await self._tele_client.get_user()
+
             yield self
 
     async def send_message(self, message: ChatMessage):
@@ -120,13 +137,14 @@ class TelegramChannel(Channel):
         """Handle message from telethon client"""
 
         message: TeleMessage = event.message
+        self.logger.info(message)
 
         if not await self.is_message_allowed(message):
             return
 
         peer_id = message.peer_id
-        if not isinstance(peer_id, telethon.types.PeerUser):  # hard-coded peer filter used during development
-            return
+        # if not isinstance(peer_id, telethon.types.PeerUser):  # hard-coded peer filter used during development
+        #     return
 
         chat_message = convert_telegram_message_to_chat_message(self.id, message, lifespan=self.build_message_lifespan(peer_id, message.id))
         await self.receive_message(chat_message)
@@ -205,8 +223,32 @@ class TelegramChannel(Channel):
                 if sender is None:
                     return False  # Do Not Respond to anonymous messages
 
-                # TODO: [2026/03/24 <Huanan>] the message mentioned is not set to True.
-                if not message.mentioned:
+                # We can not use message.mentioned
+                me = self.require_me()
+
+                def if_message_mentioned_me() -> bool:
+                    if message.mentioned:
+                        return True
+
+                    def mentioned_by_username() -> bool:
+                        username = me.username
+                        if username is None:
+                            return False
+
+                        entities = message.entities or []
+                        entities = [entity for entity in entities if isinstance(entity, telethon.types.MessageEntityMention)]
+
+                        mentions = map(lambda  x: parse_entity_from_text(message.message, x), entities)
+                        return any(username in [mention, mention.removeprefix("@")] for mention in mentions)
+
+                    def mentioned_by_userid() -> bool:
+                        entities = message.entities or []
+                        entities = [entity for entity in entities if isinstance(entity, telethon.types.MessageEntityMentionName)]
+                        return any(me.id == entity.user_id for entity in entities)
+
+                    return mentioned_by_username() or mentioned_by_userid()
+
+                if not if_message_mentioned_me():
                     return False  # In early stage, we are only support mentioned message.
 
                 policy: TelegramChannelGroupPolicy | None = None
@@ -223,7 +265,9 @@ class TelegramChannel(Channel):
                 sender_raw_id = peer_id_into_raw_int(sender)
                 sender_chat_id = peer_id_into_chat_id(sender)
 
-                ret = any(str(item) in {sender_chat_id, str(sender_raw_id)} for item in policy.whitelist)
+                ret = False
+                ret = ret or any(str(item) in {sender_chat_id, str(sender_raw_id)} for item in policy.whitelist)
+                ret = ret or (TELEGRAM_PEER_ALL_INDICATOR in policy.whitelist)
                 return ret
 
         unreachable("")
