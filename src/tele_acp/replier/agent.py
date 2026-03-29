@@ -22,6 +22,10 @@ PROMPT = (
     "<CONTEXT>\n"
     "Channel ID: {{channel_id}}\n"
     "Chat ID: {{chat_id}}\n"
+    "Message ID: {{message_id}}\n"
+    "{% if reply_to %}"
+    "Reply message ID: {{reply_to}}\n"
+    "{% endif %}"
     "</CONTEXT>\n"
     "\n"
     # User Input
@@ -34,7 +38,7 @@ def convert_acp_message_to_chat_message(channel_id: str, chat_id: str, message: 
     text = message.markdown()
     parts: list[ChatMessagePart] = [ChatMessageTextPart(text)] if text else []
 
-    return ChatMessage(id=None, channel_id=channel_id, chat_id=chat_id, receiver=None, out=False, mute=False, parts=parts)
+    return ChatMessage(id=None, channel_id=channel_id, chat_id=chat_id, receiver=None, reply_to=None, out=False, mute=False, parts=parts)
 
 
 class AgentReplier(ChatReplyable):
@@ -49,13 +53,19 @@ class AgentReplier(ChatReplyable):
     async def receive_message(self, chat: Chatable, message: ChatMessage):
         channel_id = message.channel_id
         chat_id = message.chat_id
+        reply_to = message.reply_to
 
         text_part = next((x for x in message.parts if isinstance(x, ChatMessageTextPart)), None)
         if text_part is None:
             return
 
         template = jinja2.Template(PROMPT)
-        content = template.render(channel_id=channel_id, chat_id=chat_id, content=text_part.text)
+        content = template.render(
+            channel_id=channel_id,
+            chat_id=chat_id,
+            reply_to=reply_to,
+            content=text_part.text,
+        )
         prompt = [content]
 
         self.logger.info(prompt)

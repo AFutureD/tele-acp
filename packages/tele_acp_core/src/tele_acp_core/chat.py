@@ -29,6 +29,7 @@ class ChatMessage:
     channel_id: str = Field(description="Which channel this message was sent from")
     chat_id: str = Field(description="Which chat this message wants to be sent to")
     receiver: str | None = Field(description="Which user this message wants to be sent to")
+    reply_to: str | None = Field(description="Which message this message is replying to. The value is the id of the message in the chat.")
 
     out: bool = Field(description="Is this an outgoing message")
 
@@ -42,11 +43,15 @@ class ChatMessage:
 
     @staticmethod
     def Empty() -> ChatMessage:
-        return ChatMessage(meta={}, id=None, channel_id="", chat_id="", receiver="", out=False, mute=False)
+        return ChatMessage(meta={}, id=None, channel_id="", chat_id="", receiver=None, reply_to=None, out=False, mute=False)
 
     @staticmethod
-    def create_simple_text_message(channel_id: str, chat_id: str, text: str, receiver: str | None = None, out: bool = False, mute: bool = False) -> ChatMessage:
-        return ChatMessage(parts=[ChatMessageTextPart(text)], id=None, channel_id=channel_id, chat_id=chat_id, receiver=receiver, out=out, mute=mute)
+    def create_simple_text_message(
+        channel_id: str, chat_id: str, text: str, receiver: str | None = None, reply_to: str | None = None, out: bool = False, mute: bool = False
+    ) -> ChatMessage:
+        return ChatMessage(
+            parts=[ChatMessageTextPart(text)], id=None, channel_id=channel_id, chat_id=chat_id, receiver=receiver, reply_to=reply_to, out=out, mute=mute
+        )
 
 
 @dataclass
