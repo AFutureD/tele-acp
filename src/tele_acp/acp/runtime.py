@@ -176,7 +176,7 @@ class ACPRuntimeHub:
         self._mcp_servers = mcp_servers
         self._runtimes: dict[str, ACPAgentRuntime] = {}
 
-    async def build_acp_runtime(self, agent: AgentConfig) -> ACPAgentRuntime:
+    async def spawn_acp_runtime(self, agent: AgentConfig) -> ACPAgentRuntime:
         assert self._stack is not None
 
         acp_config = self.get_acp_config(agent.acp_id)

@@ -1,6 +1,6 @@
 import shlex
 
-from tele_acp_core import Chatable, ChatMessage, ChatMessageTextPart, ChatReplyable
+from tele_acp_core import Chatable, ChatCommandResponder, ChatMessage, ChatMessageTextPart, ChatReplyable
 
 from tele_acp.command import CommandChain
 from tele_acp.constant import SUSIE_COMMAND_TRIGGER
@@ -11,6 +11,12 @@ class CommandReplier(ChatReplyable):
         self._replier = replier
         self.command_center = CommandChain(chain_to)
 
+        if isinstance(replier, ChatCommandResponder):
+            commands = replier.list_commands()
+            for command in commands:
+                self.command_center.register(command)
+
+
     async def receive_message(self, chat: Chatable, message: ChatMessage):
         if (
             (text_part := next((x for x in message.parts if isinstance(x, ChatMessageTextPart)), None))
@@ -19,7 +25,7 @@ class CommandReplier(ChatReplyable):
         ):
             command = text.removeprefix(SUSIE_COMMAND_TRIGGER)
             name, *args = shlex.split(command)
-            if self.can_execute(name):
+            if await self.can_execute(name):
                 await self.execute_command(chat, message, name, *args)
         else:
             if replier := self._replier:

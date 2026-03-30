@@ -5,19 +5,28 @@ from datetime import datetime
 
 from tele_acp_core import Channel, Chatable, ChatAwareError, ChatMessage, ChatMessageQueryable, ChatMessageTextPart, ChatReplyable
 
+from tele_acp.command import CommandChain
 from tele_acp.config import ChatSettings
+
+from .inspect import Inspector
 
 IGNORE_MESSAGE_DURATION_IN_SECONDS = 120.0
 
 
 class Chat(Chatable, ChatMessageQueryable):
-    def __init__(self, chat_id: str, channel: Channel, settings: ChatSettings, replier: ChatReplyable):
+    def __init__(self, chat_id: str, channel: Channel, settings: ChatSettings, replier: ChatReplyable, command_chain: CommandChain):
         self.id = chat_id
         self.replier = replier
         self.channel = channel
         self.logger = logging.getLogger(__name__ + ":" + chat_id)
         self._ignore_until: float = asyncio.get_event_loop().time()
         self.settings = settings
+        self.command_chain = command_chain
+        self.inspector = Inspector()
+
+
+        for command in self.inspector.list_commands():
+            self.command_chain.register(command)
 
     @property
     def ignore_message(self) -> bool:

@@ -30,11 +30,11 @@ class APP:
         acp_hub = ACPRuntimeHub(config, mcp_servers=[builtin_mcp])
 
         # Layer Two: The Data Process
-        replier_hub = ChatReplierHub(config, acp_hub, command_chain)
+        replier_hub = ChatReplierHub(config, acp_hub)
         channel_hub = ChannelHub(config)
 
         # Layer Three: The Domain Logic
-        chat_manager = ChatManager(config, channel_hub, replier_hub)
+        chat_manager = ChatManager(config, channel_hub, replier_hub, command_chain)
 
         # Layer Four:
         router = Router(chat_manager)

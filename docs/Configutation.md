@@ -47,6 +47,9 @@ forward_to = ""
 #
 # # The ID of the `Channel`
 # channel = "you_telegram_account_name"
+#
+# # Optional: only match these chat IDs.
+# # chat_ids = ["123456789", "G987654321"]
 ```
 
 ## 3. FAQ
@@ -134,9 +137,23 @@ channel = "my_account"
 agent = "ops"
 ```
 
+You can also bind specific chats to a different agent:
+
+```toml
+[[bindings]]
+channel = "my_account"
+chat_ids = ["123456789", "G987654321"]
+agent = "ops"
+
+[[bindings]]
+channel = "my_account"
+agent = "default"
+```
+
 Notes:
 
 - `channel` must match the key used in `[channels.<id>]`, not `session_name`.
+- `chat_ids` is optional. When present, the binding only matches those chats. A single `chat_id` value is also accepted and normalized to `chat_ids = ["..."]`.
 - `agent` must reference an agent ID already defined in `[[agents]]`.
-- In the current implementation, bindings are matched by channel and do not distinguish individual chats.
+- Bindings first try to match `channel + chat_ids`, then fall back to the first binding that matches only `channel`.
 - If no binding matches, Susie falls back to the `default` agent for that channel.

@@ -1,8 +1,9 @@
 import inspect
+import typing
 from typing import Any, Callable
 
-from pydantic import BaseModel, typing
-from tele_acp_core import AnyFunction, ChatMessage, Command, CommandExecutable
+from pydantic import BaseModel
+from tele_acp_core import AnyFunction, ChatMessage, Command
 from tele_acp_core.command import Context
 
 
@@ -63,12 +64,21 @@ class CommandInfo(BaseModel):
         return self.fn(*args, **kwargs)
 
 
-class CommandChain(CommandExecutable):
+class CommandChain:
     def __init__(self, chain_to: CommandChain | None = None) -> None:
         self.parent_command = chain_to
         self._registered_commands: dict[str, CommandInfo] = {}
 
         self.register_command(self.show_help, name="help", description="show help message")
+
+    def list_commands(self) -> list[CommandInfo]:
+        commands: list[CommandInfo] = list(self._registered_commands.values())
+
+        if parent := self.parent_command:
+            cmd_names = {cmd.name for cmd in commands}
+            commands += [cmd for cmd in parent.list_commands() if cmd.name not in cmd_names]
+
+        return commands
 
     def get_command(self, name: str) -> CommandInfo | None:
         if ret := self._registered_commands.get(name):
@@ -142,5 +152,6 @@ class CommandChain(CommandExecutable):
         return command
 
     async def show_help(self) -> str:
-        lines = [f"/{command.name}: {command.description}" for command in self._registered_commands.values()]
+        commands = self.list_commands()
+        lines = [f"/{command.name}: {command.description}" for command in commands]
         return "\n".join(lines)

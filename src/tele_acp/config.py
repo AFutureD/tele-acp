@@ -13,9 +13,12 @@ from tomlkit.items import Table
 
 from .shared import get_app_user_default_dir
 
+SUSIE_CHAT_ALL_INDICATOR = "*"
+
 
 class ChatSettings(BaseModel):
     channel: str = Field(description="The id of the `Channel`")
+    chat_ids: list[str] = Field(default=[SUSIE_CHAT_ALL_INDICATOR], description="Optional chat IDs matched by this binding")
     agent: str = Field(default=DEFAULT_AGENT_ID, description="The id of the `Agent`")
 
 

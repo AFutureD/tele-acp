@@ -2,7 +2,7 @@ from typing import Any, Callable, Protocol, TypeAlias
 
 from pydantic import BaseModel, Field
 
-from .chat import ChatMessage
+from .chat import ChatMessage, ChatReplyable
 
 AnyFunction: TypeAlias = Callable[..., Any]
 
@@ -26,12 +26,9 @@ class Context(BaseModel):
     message: ChatMessage = Field(description="The message that triggered the command")
 
 
-class CommandExecutable(Protocol):
-    async def can_execute(self, name: str) -> bool: ...
+class CommandProvider(Protocol):
+    def list_commands(self) -> list[Command]: ...
 
-    async def execute_command(self, name: str, *args, **kwargs) -> Any:
-        """
-        Perform the command with the given arguments.
-        Notice it do not support kwargs for now.
-        """
-        ...
+
+class ChatCommandResponder(CommandProvider, ChatReplyable):
+    ...

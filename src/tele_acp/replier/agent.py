@@ -2,13 +2,10 @@ import logging
 from typing import AsyncIterator
 
 import jinja2
-from tele_acp_core import AgentConfig, Chatable, ChatMessage, ChatMessagePart, ChatMessageTextPart, ChatReplyable
+from tele_acp_core import AgentConfig, Chatable, ChatCommandResponder, ChatMessage, ChatMessagePart, ChatMessageTextPart, Command
 
 from tele_acp.acp import ACPAgentRuntime, AcpMessage
-from tele_acp.command import CommandChain
 from tele_acp.constant import SUSIE_MCP_NAME
-
-from .command import CommandReplier
 
 PROMPT = (
     # IMPORTANT. We may move to system instructions but the acp do not support this.
@@ -41,14 +38,15 @@ def convert_acp_message_to_chat_message(channel_id: str, chat_id: str, message: 
     return ChatMessage(id=None, channel_id=channel_id, chat_id=chat_id, receiver=None, reply_to=None, out=False, mute=False, parts=parts)
 
 
-class AgentReplier(ChatReplyable):
+class AgentReplier(ChatCommandResponder):
     def __init__(self, settings: AgentConfig, acp_runtime: ACPAgentRuntime):
         self.settings = settings
         self._acp_runtime = acp_runtime
         self.logger = logging.getLogger(__name__)
 
-    async def new_session(self):
+    async def new_session(self) -> str:
         _ = await self._acp_runtime.new_session()
+        return "ok"
 
     async def receive_message(self, chat: Chatable, message: ChatMessage):
         channel_id = message.channel_id
@@ -84,15 +82,20 @@ class AgentReplier(ChatReplyable):
 
         self.logger.info("Message sent for peer: %s", message.channel_id)
 
+    def list_commands(self) -> list[Command]:
+        return [
+            Command(fn=self.new_session, name="new", description="Create a new session"),
+        ]
 
-class AgentCommandReplier(CommandReplier):
-    def __init__(self, settings: AgentConfig, acp_runtime: ACPAgentRuntime, chain_to: CommandChain | None = None):
-        agent_replier = AgentReplier(settings=settings, acp_runtime=acp_runtime)
-        super().__init__(agent_replier, chain_to)
 
-        self.agent_replier = agent_replier
-        self.command_center.register_command(fn=self.new_session, name="new", description="Start a new session")
+# class AgentCommandReplier(CommandReplier):
+#     def __init__(self, settings: AgentConfig, acp_runtime: ACPAgentRuntime, chain_to: CommandChain | None = None):
+#         agent_replier = AgentReplier(settings=settings, acp_runtime=acp_runtime)
+#         super().__init__(agent_replier, chain_to)
 
-    async def new_session(self):
-        await self.agent_replier.new_session()
-        return "ok"
+#         self.agent_replier = agent_replier
+#         self.command_center.register_command(fn=self.new_session, name="new", description="Start a new session")
+
+#     async def new_session(self):
+#         await self.agent_replier.new_session()
+#         return "ok"
