@@ -73,11 +73,12 @@ def convert_telegram_message_to_chat_message(
 
     message_id = str(message.id)
 
+    reply_to = message.reply_to
     text_part: str | None = message.message
     parts: list[ChatMessagePart] = [ChatMessageTextPart(text_part)] if text_part else []
 
     return ChatMessage(
-        id=message_id, channel_id=channel_id, chat_id=chat_id, receiver=None, out=message.out, mute=message.silent or False, parts=parts, lifespan=lifespan
+        id=message_id, channel_id=channel_id, chat_id=chat_id, receiver=None, reply_to=str(reply_to), out=message.out, mute=message.silent or False, parts=parts, lifespan=lifespan
     )
 
 
