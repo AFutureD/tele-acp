@@ -48,11 +48,18 @@ class AgentReplier(ChatCommandResponder):
         _ = await self._acp_runtime.new_session()
         return "ok"
 
-    async def list_model_opts(self, value: str | None) -> str:
+    async def list_model_opts(self, value: str | None = None) -> str:
         opts = await self._acp_runtime.list_model_opts()
         _ = opts
 
-        return f"receive {value}"
+        if value is None:
+            current = await self._acp_runtime.model()
+            lines = [f"{x.value}: {x.name}" for x in opts]
+
+            return f"current: {current}\n\n" + ("\n".join(lines))
+
+        ret = await self._acp_runtime.set_model(value)
+        return "ok" if ret else "failed"
 
     async def receive_message(self, chat: Chatable, message: ChatMessage):
         channel_id = message.channel_id

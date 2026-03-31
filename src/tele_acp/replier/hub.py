@@ -23,6 +23,8 @@ class ChatReplierHub:
             raise RuntimeError(f"agent not found for id: {agent_id}")
 
         runtime = await self._acp_hub.spawn_acp_runtime(agent_settings)
+        await runtime.require_session_id()  # start a session
+
         agent_replier = AgentReplier(agent_settings, runtime)
 
         replier = CommandReplier(agent_replier, command_chain)

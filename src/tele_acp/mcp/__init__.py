@@ -84,7 +84,7 @@ async def send_message(
         if isinstance(file, str):
             parts += [ChatMessageFilePart(path=file)]
 
-    message = ChatMessage(id=None, channel_id=channel_id, chat_id=chat_id, receiver=None, out=False, mute=False, parts=parts)
+    message = ChatMessage(id=None, channel_id=channel_id, chat_id=chat_id, receiver=None, reply_to=None, out=False, mute=False, parts=parts)
 
     await chat.send_message(message)
     return message

@@ -3,7 +3,7 @@ import contextlib
 import logging
 import uuid
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncIterator, Self
 
 import acp
 from acp.schema import SessionConfigOption, SessionConfigSelectOption
@@ -50,7 +50,7 @@ class ACPAgentRuntime(ACPAgentConnection):
 
         self.id = id
         self._session_id: str | None = None
-        self.options: list[SessionConfigOption] | None = None
+        self.session_options: dict[str, SessionConfigOption] = {}
 
     # MARK: Session
 
@@ -82,7 +82,7 @@ class ACPAgentRuntime(ACPAgentConnection):
             # _ = await self.connction.load_session(cwd=self._cwd, session_id=session_id)
 
             self._session_id = session_id
-            self.options = new_session.config_options
+            self.set_session_options(new_session.config_options)
             return session_id
         except Exception as e:
             self.logger.error(f"Failed to create session: {e}")
@@ -170,51 +170,61 @@ class ACPAgentRuntime(ACPAgentConnection):
         except asyncio.QueueShutDown:
             return
 
+    def set_session_options(self, new_value: list[SessionConfigOption] | None = None) -> None:
+        if new_value is None:
+            self.session_options.clear()
+            return
+
+        for opt in new_value:
+            self.session_options[opt.root.id] = opt
+
     async def model(self) -> str | None:
-        options = self.options
-        if options is None:
+        session_options = self.session_options
+        if session_options is None:
             return None
 
-        option = next((x for x in options if x.root.id == MODEL_CONFIG_ID), None)
+        option = session_options.get(MODEL_CONFIG_ID)
         if option is None:
             return None
 
         return option.root.current_value
 
     async def list_model_opts(self) -> list[SessionConfigSelectOption]:
-        options = self.options
-        if options is None:
+        session_options = self.session_options
+        if session_options is None:
             return []
 
-        option = next((x for x in options if x.root.id == MODEL_CONFIG_ID), None)
+        option = session_options.get(MODEL_CONFIG_ID)
         if option is None:
             return []
 
-        selections = option.root.options
+        selects = option.root.options
 
         # TODO: support SessionConfigSelectGroup
-        selections = [x for x in selections if isinstance(x, SessionConfigSelectOption)]
+        selects = [x for x in selects if isinstance(x, SessionConfigSelectOption)]
 
-        return selections
+        return selects
 
-    async def set_model(self, value) -> None:
-        options = self.options
-        if options is None:
-            return
-
+    async def set_model(self, value) -> bool:
         session_id = self.session_id
         if session_id is None:
-            return
+            return False
 
-        option = next((x for x in options if x.root.id == MODEL_CONFIG_ID), None)
+        session_options = self.session_options
+        if session_options is None:
+            return False
+
+        option = session_options.get(MODEL_CONFIG_ID)
         if option is None:
-            return
+            return False
 
         select = next((x for x in option.root.options if x.value == value), None)
         if select is None:
-            return
+            return False
 
-        await self.connection.set_config_option(MODEL_CONFIG_ID, session_id, select.value)
+        ret = await self.connection.set_config_option(MODEL_CONFIG_ID, session_id, select.value)
+        self.set_session_options(ret.config_options)
+        return True
 
 
 class ACPRuntimeHub:
@@ -257,7 +267,7 @@ class ACPRuntimeHub:
         return self._runtimes.get(id)
 
     @contextlib.asynccontextmanager
-    async def run(self) -> AsyncIterator[ACPRuntimeHub]:
+    async def run(self) -> AsyncIterator[Self]:
         async with contextlib.AsyncExitStack() as stack:
             self._stack = stack
             try:
