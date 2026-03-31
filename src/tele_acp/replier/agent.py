@@ -48,6 +48,12 @@ class AgentReplier(ChatCommandResponder):
         _ = await self._acp_runtime.new_session()
         return "ok"
 
+    async def list_model_opts(self, value: str | None) -> str:
+        opts = await self._acp_runtime.list_model_opts()
+        _ = opts
+
+        return f"receive {value}"
+
     async def receive_message(self, chat: Chatable, message: ChatMessage):
         channel_id = message.channel_id
         chat_id = message.chat_id
@@ -85,17 +91,5 @@ class AgentReplier(ChatCommandResponder):
     def list_commands(self) -> list[Command]:
         return [
             Command(fn=self.new_session, name="new", description="Create a new session"),
+            Command(fn=self.list_model_opts, name="model", description="List available model options or switch to a specific model"),
         ]
-
-
-# class AgentCommandReplier(CommandReplier):
-#     def __init__(self, settings: AgentConfig, acp_runtime: ACPAgentRuntime, chain_to: CommandChain | None = None):
-#         agent_replier = AgentReplier(settings=settings, acp_runtime=acp_runtime)
-#         super().__init__(agent_replier, chain_to)
-
-#         self.agent_replier = agent_replier
-#         self.command_center.register_command(fn=self.new_session, name="new", description="Start a new session")
-
-#     async def new_session(self):
-#         await self.agent_replier.new_session()
-#         return "ok"

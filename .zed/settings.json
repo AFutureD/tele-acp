@@ -6,8 +6,21 @@
           "command": "zsh",
           "arguments": ["-c", "uv run ruff check --fix --stdin-filename {buffer_path} | uv run ruff format --stdin-filename {buffer_path}"],
         },
+        // "language_server": {
+        //   "name": "ruff",
+        // },
+      },
+      "code_actions_on_format": {
+        "source.organizeImports.ruff": true,
       },
       "format_on_save": "on",
+      "language_servers": [
+        // Enable ty, disable basedpyright, and enable all
+        // other registered language servers (ruff, pylsp, pyright).
+        "ty",
+        "!basedpyright",
+        "...",
+      ],
     },
   },
   "lsp": {

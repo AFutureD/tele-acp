@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import AsyncIterator
 
 import acp
+from acp.schema import SessionConfigOption, SessionConfigSelectOption
 from tele_acp_core import AgentConfig
 
 from tele_acp.config import Config
@@ -28,6 +29,9 @@ def get_agent_work_dir(id: str) -> Path:
     return agent_dir
 
 
+MODEL_CONFIG_ID = "model"
+
+
 class ACPAgentRuntime(ACPAgentConnection):
     """spawn acp client based on ACPAgentConfig and maintain sessions"""
 
@@ -46,6 +50,7 @@ class ACPAgentRuntime(ACPAgentConnection):
 
         self.id = id
         self._session_id: str | None = None
+        self.options: list[SessionConfigOption] | None = None
 
     # MARK: Session
 
@@ -77,6 +82,7 @@ class ACPAgentRuntime(ACPAgentConnection):
             # _ = await self.connction.load_session(cwd=self._cwd, session_id=session_id)
 
             self._session_id = session_id
+            self.options = new_session.config_options
             return session_id
         except Exception as e:
             self.logger.error(f"Failed to create session: {e}")
@@ -163,6 +169,52 @@ class ACPAgentRuntime(ACPAgentConnection):
             await queue.put(update)
         except asyncio.QueueShutDown:
             return
+
+    async def model(self) -> str | None:
+        options = self.options
+        if options is None:
+            return None
+
+        option = next((x for x in options if x.root.id == MODEL_CONFIG_ID), None)
+        if option is None:
+            return None
+
+        return option.root.current_value
+
+    async def list_model_opts(self) -> list[SessionConfigSelectOption]:
+        options = self.options
+        if options is None:
+            return []
+
+        option = next((x for x in options if x.root.id == MODEL_CONFIG_ID), None)
+        if option is None:
+            return []
+
+        selections = option.root.options
+
+        # TODO: support SessionConfigSelectGroup
+        selections = [x for x in selections if isinstance(x, SessionConfigSelectOption)]
+
+        return selections
+
+    async def set_model(self, value) -> None:
+        options = self.options
+        if options is None:
+            return
+
+        session_id = self.session_id
+        if session_id is None:
+            return
+
+        option = next((x for x in options if x.root.id == MODEL_CONFIG_ID), None)
+        if option is None:
+            return
+
+        select = next((x for x in option.root.options if x.value == value), None)
+        if select is None:
+            return
+
+        await self.connection.set_config_option(MODEL_CONFIG_ID, session_id, select.value)
 
 
 class ACPRuntimeHub:

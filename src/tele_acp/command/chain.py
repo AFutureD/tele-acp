@@ -1,6 +1,6 @@
 import inspect
 import typing
-from typing import Any, Callable
+from typing import Any, Callable, Self
 
 from pydantic import BaseModel
 from tele_acp_core import AnyFunction, ChatMessage, Command
@@ -65,7 +65,7 @@ class CommandInfo(BaseModel):
 
 
 class CommandChain:
-    def __init__(self, chain_to: CommandChain | None = None) -> None:
+    def __init__(self, chain_to: Self | None = None) -> None:
         self.parent_command = chain_to
         self._registered_commands: dict[str, CommandInfo] = {}
 
