@@ -1,6 +1,6 @@
 import contextlib
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Protocol, Self
 
 from pydantic import ConfigDict, Field
 from pydantic.dataclasses import dataclass
@@ -41,17 +41,15 @@ class ChatMessage:
 
     meta: dict[str, Any] = Field(default_factory=dict, description="Metadata for the message")
 
-    @staticmethod
-    def Empty() -> ChatMessage:
-        return ChatMessage(meta={}, id=None, channel_id="", chat_id="", receiver=None, reply_to=None, out=False, mute=False)
+    @classmethod
+    def Empty(cls) -> Self:
+        return cls(meta={}, id=None, channel_id="", chat_id="", receiver=None, reply_to=None, out=False, mute=False)
 
-    @staticmethod
+    @classmethod
     def create_simple_text_message(
-        channel_id: str, chat_id: str, text: str, receiver: str | None = None, reply_to: str | None = None, out: bool = False, mute: bool = False
-    ) -> ChatMessage:
-        return ChatMessage(
-            parts=[ChatMessageTextPart(text)], id=None, channel_id=channel_id, chat_id=chat_id, receiver=receiver, reply_to=reply_to, out=out, mute=mute
-        )
+        cls, channel_id: str, chat_id: str, text: str, receiver: str | None = None, reply_to: str | None = None, out: bool = False, mute: bool = False
+    ) -> Self:
+        return cls(parts=[ChatMessageTextPart(text)], id=None, channel_id=channel_id, chat_id=chat_id, receiver=receiver, reply_to=reply_to, out=out, mute=mute)
 
 
 @dataclass

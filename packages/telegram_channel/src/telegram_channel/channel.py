@@ -1,7 +1,7 @@
 import contextlib
 import logging
 from datetime import datetime
-from typing import AsyncIterator, Awaitable, Callable
+from typing import AsyncIterator, Awaitable, Callable, Self
 
 import telethon
 import telethon.hints
@@ -130,7 +130,7 @@ class TelegramChannel(Channel):
         raise ValueError("Not Found")
 
     @contextlib.asynccontextmanager
-    async def run_until_finish(self) -> AsyncIterator[Channel]:
+    async def run_until_finish(self) -> AsyncIterator[Self]:
         async with contextlib.AsyncExitStack() as stack:
             await stack.enter_async_context(self._tele_client)
             self._cached_me = await self._tele_client.get_user()
