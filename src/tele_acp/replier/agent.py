@@ -50,7 +50,7 @@ class AgentReplier(ChatCommandResponder):
         template = env.get_template("SYSTEM.md")
 
         prompt = template.render(SUSIE_MCP_NAME=SUSIE_MCP_NAME)
-        await self._acp_runtime.load_system_instruction(prompt)
+        await self._acp_runtime.load_system_instruction_if_needed(prompt)
 
         return "ok"
 

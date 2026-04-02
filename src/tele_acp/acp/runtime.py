@@ -53,6 +53,7 @@ class ACPAgentRuntime(ACPAgentConnection):
         self.id = id
         self._session_id: str | None = None
         self.session_options: dict[str, SessionConfigOption] = {}
+        self._should_load_system_instructions = True
 
     # MARK: Session
 
@@ -85,6 +86,7 @@ class ACPAgentRuntime(ACPAgentConnection):
 
             self._session_id = session_id
             self.set_session_options(new_session.config_options)
+            self._should_load_system_instructions = True
             return session_id
         except Exception as e:
             self.logger.error(f"Failed to create session: {e}")
@@ -96,14 +98,16 @@ class ACPAgentRuntime(ACPAgentConnection):
     def is_active(self) -> bool:
         return self._update_queue is not None
 
-    async def load_system_instruction(self, instruction: str):
+    async def load_system_instruction_if_needed(self, instruction: str):
+        if not self._should_load_system_instructions:
+            return
+        self._should_load_system_instructions = False
+
         session_id = await self.require_session_id()
 
         prompt: list[AcpContentBlock] = [acp.text_block(instruction)]
 
-        _ = asyncio.create_task(
-            self.connection.prompt(prompt=prompt, session_id=session_id),
-        )
+        await self.connection.prompt(prompt=prompt, session_id=session_id)
         await self.connection.cancel(session_id)
 
     async def prompt(self, parts: list[str]) -> AsyncIterator[AcpMessage]:
