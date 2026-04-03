@@ -62,14 +62,12 @@ See [Configuration](./docs/Configutation.md) for details.
 
 ## Design
 
-1. `Chat`: the place where one or more user communicate with agents through channels
-2. `Agent`: the agent that do things by LLMs, for now by acps
-3. `Channel`: the message comes and goes
-4. `Replier`: reponse to the user messages
-5. `Command Chian`: handle user commmand messages
+1. `Chat`: a conversation unit, such as a 1-to-1 chat or a Telegram group.
+2. `Channel`: the transport layer that sends and receives messages.
+3. `Replier`: the component that handles incoming messages and produces replies.
+4. `Agent`: an ACP-backed LLM agent used by an agent replier.
+5. `Command Chain`: the command dispatcher for slash commands.
 
-a chat may represent 1-1 or group chat on telegram.
-a chat have mutiple repliers
-a agent replier have a agent behind to it.
+A chat may have multiple repliers. An agent replier is backed by an agent.
 
-the command chain can control chat, the replier, or the global state.
+The command chain can be used to control the chat, the repliers, or global state.
