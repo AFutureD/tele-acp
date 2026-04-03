@@ -1,7 +1,7 @@
 import asyncio
 import contextlib
 import logging
-from typing import AsyncIterator
+from typing import AsyncIterator, Self
 
 from tele_acp_core import Channel, ChatMessage
 from telegram_channel import TelegramChannel
@@ -36,13 +36,13 @@ class ChannelHub:
         return channel
 
     @contextlib.asynccontextmanager
-    async def run(self) -> AsyncIterator[ChannelHub]:
+    async def run(self) -> AsyncIterator[Self]:
         assert len(self._channels) != 0, "No channels configured"
 
         async with contextlib.AsyncExitStack() as stack:
             async with self._channels_lock:
                 for channel in self._channels.values():
-                    channel: Channel = await stack.enter_async_context(channel.run_until_finish())
+                    _ = await stack.enter_async_context(channel.run_until_finish())
                     if not await channel.status:
                         raise RuntimeError(f"Channel {channel.id} is not authenticated")
 

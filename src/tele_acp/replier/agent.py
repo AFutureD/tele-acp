@@ -4,9 +4,9 @@ from typing import AsyncIterator
 import jinja2
 from tele_acp_core import AgentConfig, Chatable, ChatCommandResponder, ChatMessage, ChatMessagePart, ChatMessageTextPart, Command
 
-from src.tele_acp.constant import SUSIE_MCP_NAME
 from tele_acp.acp import ACPAgentRuntime, AcpMessage
 from tele_acp.agents import get_agents_dir
+from tele_acp.constant import SUSIE_MCP_NAME
 
 PROMPT = (
     # Context Info

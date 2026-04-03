@@ -43,10 +43,10 @@ class TGClient(telethon.TelegramClient):
     def __init__(self: "TGClient", session: TGSession, api_id: int, api_hash: str, **kwargs):
         super().__init__(session, api_id, api_hash, **kwargs)
 
-        self.contacts_users_peer_last_update_date = 0
+        self.contacts_users_peer_last_update_date = 0.0
         self.contacts_users_peer: list[PeerUser] = []
 
-        self.dialogs_last_update_date = 0
+        self.dialogs_last_update_date = 0.0
         self.dialogs: dict[int, Dialog] = {}
 
     async def _start_without_login(self) -> "TGClient":
@@ -140,21 +140,20 @@ class TGClient(telethon.TelegramClient):
                 user_phone=me.phone,
                 user_display_name=format_me(me),
             )
-        except sqlite3.OperationalError as exc:
-            if "locked" in str(exc).casefold():
-                return None
+        except sqlite3.OperationalError:
+            return None
 
-    async def send_message(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def send_message(
         self,
         entity: hints.EntityLike,
         message: hints.MessageLike = "",
         *,
         reply_to: None | int | telethon.types.Message = None,
-        attributes: list[telethon.types.TypeDocumentAttribute] | None = None,
+        attributes: typing.Sequence[telethon.types.TypeDocumentAttribute] | None = None,
         parse_mode: str | None = None,
         formatting_entities: None | typing.List[telethon.types.TypeMessageEntity] = None,
         link_preview: bool = True,
-        file: hints.FileLike | list[hints.FileLike] | None = None,
+        file: hints.FileLike | typing.Sequence[hints.FileLike] | None = None,
         thumb: hints.FileLike | None = None,
         force_document: bool = False,
         clear_draft: bool = False,
@@ -167,7 +166,7 @@ class TGClient(telethon.TelegramClient):
         nosound_video: bool | None = None,
         send_as: hints.EntityLike | None = None,
         message_effect_id: int | None = None,
-    ) -> telethon.types.Message:  # ty:ignore[invalid-method-override]
+    ) -> telethon.types.Message:
         """Send a message to a Telegram entity.
 
         entity resolution:

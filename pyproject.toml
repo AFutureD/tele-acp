@@ -28,10 +28,12 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mypy>=1.20.0",
     "pyright>=1.1.408",
     "pytest>=9.0.2",
     "ruff==0.15.7",
     "ty==0.0.24",
+    "types-dateparser>=1.4.0.20260328",
 ]
 
 [build-system]
@@ -64,3 +66,7 @@ docstring-code-format = true
 
 [tool.ruff.lint]
 extend-select = ["I"]
+
+[[tool.mypy.overrides]]
+module = ["telethon.*"]
+follow_untyped_imports = true

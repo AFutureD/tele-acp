@@ -260,8 +260,7 @@ class TelegramChannel(Channel):
                         return any(username in [mention, mention.removeprefix("@")] for mention in mentions if mention is not None)
 
                     def mentioned_by_userid() -> bool:
-                        entities = message.entities or []
-                        entities = [entity for entity in entities if isinstance(entity, telethon.types.MessageEntityMentionName)]
+                        entities = [entity for entity in (message.entities or []) if isinstance(entity, telethon.types.MessageEntityMentionName)]
                         return any(me.id == entity.user_id for entity in entities)
 
                     return mentioned_by_username() or mentioned_by_userid()
@@ -294,12 +293,11 @@ class TelegramChannel(Channel):
     async def list_chats(self, with_archived: bool = False) -> list[ChatInfo]:
         archived = None if with_archived else False
 
-        dialogs = await self._tele_client.get_cached_dialogs(archived=archived)
+        dialogs: list[TeleDialog] = await self._tele_client.get_cached_dialogs(archived=archived)
 
         ret: list[ChatInfo] = []
 
         for dialog in dialogs:
-            dialog: TeleDialog = dialog
             peer = dialog.dialog.peer
 
             info = ChatInfo(channel_id=self.id, chat_id=peer_id_into_chat_id(peer), name=dialog.name)
