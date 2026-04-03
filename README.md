@@ -43,6 +43,9 @@ There are two parts.
 
 **Part one: ACP**
 
+> [!IMPORTANT]
+> At present, we only support Codex and Kimi.
+
 You should manage your agent directly rather than through Susie.
 
 The working directory is `~/.config/susie/workspace/<YOUR_AGENT_ID>`.

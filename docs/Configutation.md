@@ -160,3 +160,18 @@ Notes:
 - `agent` must reference an agent ID already defined in `[[agents]]`.
 - Bindings first try to match `channel + chat_ids`, then fall back to the first binding that matches only `channel`.
 - If no binding matches, Susie falls back to the `default` agent for that channel.
+
+### 3.4 How do I change the ACP client used by an agent?
+
+Set `acp_id` in the corresponding `[[agents]]` entry:
+
+```toml
+[[agents]]
+id = "default"
+acp_id = "codex"
+```
+
+Currently supported values are `codex` and `kimi`.
+
+> [!NOTE]
+> [ACP Registry](https://github.com/agentclientprotocol/registry) is on the roadmap.
