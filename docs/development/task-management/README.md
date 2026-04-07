@@ -25,3 +25,9 @@ example `260407T1154`.
 ### Root Document
 
 Every task folder must contain a root document named `TASK.md`.
+
+### Template 
+
+You can find them under [template](./template) folder.
+
+- [000000T0000-task-template](./template/000000T0000-task-template)

@@ -54,8 +54,8 @@ Meta JSON Schema
 
 * Task: 000000T0000-task-template
 * Author: [Author 1](https://github.com/example)
-* Status: "DRAFT"
-* Type: "FEAT"
+* Status: DRAFT
+* Type: FEAT
 * Related: [000000T0000-task-template](../000000T0000-task-template)
 
 ## Content
@@ -64,7 +64,8 @@ Use this file to describe the task clearly and concisely.
 
 The content can follow these guidelines:
 1. Reference related file paths when helpful.
-   Example: `[example-snapshot.png](./assets/example-snapshot.png)`, `[related-task](../000000T0000-task-template)`
+   - `[example-snapshot.png](./assets/example-snapshot.png)`
+   - `[related-task](../000000T0000-task-template)`
 2. Include references and footnotes whenever they add useful context.
 
 ## Acknowledgments
