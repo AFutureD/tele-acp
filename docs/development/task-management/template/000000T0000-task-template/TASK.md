@@ -58,15 +58,31 @@ Meta JSON Schema
 * Type: FEAT
 * Related: [000000T0000-task-template](../000000T0000-task-template)
 
+
 ## Content
 
-Use this file to describe the task clearly and concisely.
+Use this section to describe the task in as much detail as needed.
 
-The content can follow these guidelines:
-1. Reference related file paths when helpful.
-   - `[example-snapshot.png](./assets/example-snapshot.png)`
-   - `[related-task](../000000T0000-task-template)`
-2. Include references and footnotes whenever they add useful context.
+You may place related assets in the task folder.
+
+## Guidelines
+
+### Links
+
+Links starting with `/` will be relative to the repository root. 
+You can use all relative link operands, such as `./` and `../`.
+
+**Examples**
+
+- `[example-snapshot.png](./assets/example-snapshot.png)`
+- `[related-task](../000000T0000-task-template)`
+- `[AGENTS.md](/AGENTS.md)`
+
+
+### References and Footnotes
+
+Add references and footnotes whenever they provide useful context.
+
 
 ## Acknowledgments
 

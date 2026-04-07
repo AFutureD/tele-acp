@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines how tasks should be organized and documented for this project.
+This document defines how tasks should be organized and documented in this project.
 
 ## Scenarios
 
@@ -26,8 +26,12 @@ example `260407T1154`.
 
 Every task folder must contain a root document named `TASK.md`.
 
-### Template 
+### Templates
 
-You can find them under [template](./template) folder.
+Task templates are available in the [template](./template) folder.
 
 - [000000T0000-task-template](./template/000000T0000-task-template)
+
+## Location
+
+All tasks should be listed under [tasks](/docs/tasks).
