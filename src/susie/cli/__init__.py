@@ -8,6 +8,7 @@ import typer
 
 from susie.constant import VERSION
 
+from .acp import acp_cli
 from .auth import auth_cli
 from .mainloop import mainloop
 from .shared import SharedArgs
@@ -33,6 +34,7 @@ cli = typer.Typer(
     """,
 )
 cli.add_typer(auth_cli, name="auth")
+cli.add_typer(acp_cli, name="acp")
 
 
 def _version_callback(value: bool) -> None:

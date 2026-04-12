@@ -19,3 +19,8 @@ def get_app_user_data_dir() -> Path:
     path = Path.home() / ".local" / "share" / NAME
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def get_app_user_default_dir() -> Path:
+    """Backward-compatible alias for the application data directory."""
+    return get_app_user_data_dir()
