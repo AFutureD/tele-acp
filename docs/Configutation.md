@@ -103,6 +103,7 @@ groups."*" = { whitelist = ["*"], only_mention = true }
 Notes:
 
 - `susie auth login` usually writes a user-channel configuration automatically.
+- `susie auth login --qrcode` uses Telegram's QR-login flow for user accounts and prints an ASCII QR code in the terminal.
 - `session_name` is the name of the local Telegram session.
 - `whitelist` limits which peer IDs or group IDs are allowed.
 - `allow_contacts` only applies to `telegram_user`.

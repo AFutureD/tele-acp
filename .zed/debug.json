@@ -36,4 +36,12 @@
     "cwd": "$ZED_WORKTREE_ROOT",
     "args": ["--session", "6c7b563c-68c8-42b8-b723-a1150caf0797", "auth", "logout"],
   },
+  {
+    "label": "Susie Login Qrcode",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "susie.cli",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "args": ["auth", "login", "--qrcode"],
+  },
 ]

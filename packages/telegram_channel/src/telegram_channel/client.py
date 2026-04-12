@@ -10,8 +10,9 @@ from typing import Callable, cast
 import telethon
 from susie_core import SessionInfo
 from telethon import functions, hints
-from telethon.errors import RPCError
+from telethon.errors import RPCError, SessionPasswordNeededError
 from telethon.tl.custom import Dialog, Message
+from telethon.tl.custom.qrlogin import QRLogin
 from telethon.tl.functions.account import GetAuthorizationsRequest
 from telethon.tl.types.contacts import Contacts
 from telethon.types import PeerUser
@@ -107,6 +108,34 @@ class TGClient(telethon.TelegramClient):
             if inspect.isawaitable(result):
                 await result
             me = await self.get_me()
+
+            session_ensure_current_valid(session=self.session)
+
+            return me if isinstance(me, telethon.types.User) else None
+        except RPCError:
+            session_ensure_current_valid(session=None)
+            raise
+        except KeyboardInterrupt:
+            session_ensure_current_valid(session=None)
+            raise
+
+    async def login_as_qrcode(
+        self,
+        password: Callable[[], str],
+        on_qrcode: Callable[[QRLogin], None] | None = None,
+    ) -> telethon.types.User | None:
+        try:
+            if not self.is_connected():
+                await self.connect()
+
+            qr_login = await self.qr_login()
+            if on_qrcode is not None:
+                on_qrcode(qr_login)
+
+            try:
+                me = await qr_login.wait()
+            except SessionPasswordNeededError:
+                me = await self.sign_in(password=password())
 
             session_ensure_current_valid(session=self.session)
 

@@ -8,6 +8,7 @@ from typing import Annotated
 import typer
 
 from susie.constant import VERSION
+from susie.logger import configure_logging
 
 from .acp import acp_cli
 from .auth import auth_cli
@@ -79,7 +80,9 @@ def main(
     _ = version
 
     ctx.obj = SharedArgs(config_file=config_file, session=session)
-    logging.getLogger().setLevel(logging.WARNING)
+
+    log_level = logging.INFO if ctx.invoked_subcommand == "start" else logging.WARN
+    configure_logging(log_level)
 
 
 @cli.command(name="start")

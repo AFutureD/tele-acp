@@ -26,6 +26,7 @@ This will also update the channel settings in the configuration file.
 
 ```bash
 susie auth login
+susie auth login --qrcode  # print an ASCII QR code in the terminal
 susie auth me
 ```
 

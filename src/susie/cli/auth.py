@@ -1,10 +1,13 @@
 import asyncio
+import io
 from pathlib import Path
 from typing import Annotated
 
+import qrcode
 import typer
 from rich import print
 from telegram_channel import TelegramBotChannel, TelegramUserChannel, TGClient, TGSession, format_me, session_switch
+from telethon.tl.custom.qrlogin import QRLogin
 
 from susie.config import delete_channel_config, load_config, update_or_save_channel_config
 
@@ -61,12 +64,16 @@ def auth_login(
     ctx: typer.Context,
     bot_token: Annotated[str | None, typer.Option("--bot", help="Login as bot using the provided bot token.")] = None,
     channel_id: Annotated[str | None, typer.Option("--id", help="Login as channel using the provided channel ID.")] = None,
+    use_qrcode: Annotated[bool, typer.Option("--qrcode", help="Login as user through Telegram QR-login flow.")] = False,
     switch_as_current: Annotated[
         bool,
         typer.Option("--switch", "-s", help="Automatic set the login session as active one."),
     ] = False,
 ):
     cli_args: SharedArgs = ctx.obj
+
+    if bot_token is not None and use_qrcode:
+        raise typer.BadParameter("Cannot combine --qrcode with --bot.")
 
     def get_phone() -> str:
         print(
@@ -93,6 +100,33 @@ def auth_login(
     def get_password() -> str:
         return typer.prompt("Please enter your password", type=str, hide_input=True)
 
+    def format_qrcode_ascii(data: str) -> str:
+        buffer = io.StringIO()
+        qr = qrcode.QRCode(border=1)
+        qr.add_data(data)
+        qr.make(fit=True)
+        qr.print_ascii(out=buffer, tty=False, invert=True)
+        return buffer.getvalue().rstrip()
+
+    def show_qrcode(qr_login: QRLogin) -> None:
+        expires_at = qr_login.expires.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+        qrcode_ascii = format_qrcode_ascii(qr_login.url)
+
+        print(
+            f"""
+            Telegram QR login requires a Telegram app that is [bold green]already logged in[/bold green].
+
+            1. Open Telegram on another logged-in device.
+            2. Open the login-by-QR flow in Telegram and scan the ASCII QR code below.
+            3. Approve the login request in Telegram.
+            4. Your [bold green]password[/bold green] will be asked if Two-Step Verification is enabled.
+
+            [bold red]IMPORTANT: This login payload expires at {expires_at}.[/bold red]
+            """
+        )
+        typer.echo(qrcode_ascii)
+        print(f"\nRaw login URL: [bold cyan]{qr_login.url}[/bold cyan]")
+
     async def _run() -> bool:
         config = load_config(config_file=cli_args.config_file)
         tele_client = TGClient.create_simple(
@@ -105,6 +139,8 @@ def auth_login(
         try:
             if bot_token is not None:
                 me = await tele_client.login_as_bot(bot_token=bot_token)
+            elif use_qrcode:
+                me = await tele_client.login_as_qrcode(password=get_password, on_qrcode=show_qrcode)
             else:
                 me = await tele_client.login_as_user(phone=get_phone, code=get_code, password=get_password)
         except Exception as e:
