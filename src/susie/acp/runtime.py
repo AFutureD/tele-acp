@@ -108,7 +108,11 @@ class ACPAgentRuntime(ACPAgentConnection):
 
         prompt: list[AcpContentBlock] = [acp.text_block(instruction)]
 
-        await self.connection.prompt(prompt=prompt, session_id=session_id)
+        try:
+            await self.connection.prompt(prompt=prompt, session_id=session_id)
+        except acp.RequestError as e:
+            self.logger.error(f"Failed to prompt: {e.to_error_obj()}")
+
         await self.connection.cancel(session_id)
 
     async def prompt(self, parts: list[str]) -> AsyncIterator[AcpMessage]:
@@ -125,6 +129,9 @@ class ACPAgentRuntime(ACPAgentConnection):
             try:
                 ret = await self.connection.prompt(prompt=prompt, session_id=session_id)
                 return ret
+            except acp.RequestError as e:
+                self.logger.error(f"Failed to prompt: {e.to_error_obj()}")
+                raise
             finally:
                 update_queue.shutdown()
 

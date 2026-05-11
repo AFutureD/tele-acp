@@ -25,9 +25,7 @@ async def _prepare_manager(refresh: bool) -> tuple[ACPRegisteryManage, ACPRegist
     cache = ACPRegistryCache()
     manager = ACPRegisteryManage(cache)
 
-    registry = await cache.get_registry()
-    if refresh or registry is None:
-        registry = await cache.fetch_registery_and_cache()
+    registry = await cache.fetch_registery_and_cache()
 
     return manager, registry
 
@@ -151,7 +149,7 @@ def acp_update(
             targets = [acp_id]
         else:
             statuses = await manager.list_acp_status()
-            targets = [status.acp_id for status in statuses if status.installed]
+            targets = [status.acp_id for status in statuses if status.installed and status.new_version]
 
         for target in targets:
             await manager.install_acp(target)

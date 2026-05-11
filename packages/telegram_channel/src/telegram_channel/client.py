@@ -352,3 +352,7 @@ class TGClient(telethon.TelegramClient):
         self.dialogs_last_update_date = now
 
         return list(self.dialogs.values())
+
+    async def list_admin_user(self, entity: hints.EntityLike) -> list[telethon.types.User]:
+        participants = await self.get_participants(entity, filter=telethon.types.ChannelParticipantsAdmins)
+        return [participant for participant in participants if isinstance(participant, telethon.types.User) or participant.is_self]

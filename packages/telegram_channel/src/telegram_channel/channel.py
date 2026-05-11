@@ -13,7 +13,7 @@ from telethon.tl.custom.dialog import Dialog as TeleDialog
 from telethon.types import MessageEntityBlockquote, TypeMessageEntity
 
 from .client import TGClient
-from .settings import TELEGRAM_PEER_ALL_INDICATOR, TelegramChannelGroupPolicy, TelegramUserChannel, TypeTelegramChannel
+from .settings import TELEGRAM_PEER_ALL_INDICATOR, TelegramBotChannel, TelegramChannelGroupPolicy, TelegramUserChannel, TypeTelegramChannel
 
 
 def peer_id_into_raw_int(peer_id: telethon.types.TypePeer) -> int:
@@ -219,7 +219,9 @@ class TelegramChannel(Channel):
         # if not isinstance(peer_id, telethon.types.PeerUser):  # hard-coded peer filter used during development
         #     return
 
-        chat_message = convert_telegram_message_to_chat_message(self.id, message, lifespan=self.build_message_lifespan(peer=peer_id, message_id=message.id))
+        lifespan = self.build_message_lifespan(peer=peer_id, message_id=message.id) if not self.is_bot() else None
+
+        chat_message = convert_telegram_message_to_chat_message(self.id, message, lifespan=lifespan)
         await self.receive_message(chat_message)
 
     @contextlib.asynccontextmanager
@@ -239,6 +241,14 @@ class TelegramChannel(Channel):
 
         match peer_id:
             case telethon.types.PeerUser():
+
+                async def _is_admin(settings: TypeTelegramChannel, peer: telethon.types.PeerUser):
+                    chat = message.chat
+                    if not chat:
+                        return False
+
+                    admins = await self._tele_client.list_admin_user(chat)
+                    return any(admin.id == peer.user_id for admin in admins)
 
                 async def _is_allowed_by_contact(settings: TypeTelegramChannel, peer: telethon.types.PeerUser) -> bool:
                     if not isinstance(settings, TelegramUserChannel):
@@ -262,8 +272,9 @@ class TelegramChannel(Channel):
 
                 match_contact_list = await _is_allowed_by_contact(self.settings, peer_id)
                 match_whitelist = _is_allowed_by_white_list(self.settings, peer_id)
+                match_admin = await _is_admin(self.settings, peer_id)
 
-                return match_whitelist or match_contact_list
+                return match_whitelist or match_contact_list or match_admin
 
             case telethon.types.PeerChannel() | telethon.types.PeerChat():
                 """
@@ -362,3 +373,8 @@ class TelegramChannel(Channel):
         messages = await self._tele_client.list_messages(peer_id, date_start=date_start, date_end=date_end, limit=num)
 
         return [convert_telegram_message_to_chat_message(channel_id=self.id, message=message) for message in messages]
+
+    def is_bot(self) -> bool:
+        if (settings := self.settings) and isinstance(settings, TelegramBotChannel):
+            return True
+        return False

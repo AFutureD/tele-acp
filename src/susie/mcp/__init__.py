@@ -27,8 +27,8 @@ class MCP(FastMCP):
     def set_chat_manager(self, chat_manager: ChatManager) -> None:
         self._chat_manager = chat_manager
 
-    async def get_chat(self, channel_id: str, chat_id: str) -> Chat:
-        chat = await self.chat_manager.require_chat(channel_id, chat_id)
+    async def get_chat(self, channel_id: str, chat_id: str) -> Chat | None:
+        chat = self.chat_manager.get_chat(channel_id, chat_id)
         return chat
 
 
@@ -74,6 +74,8 @@ async def send_message(
 
     """
     chat = await cast(MCP, ctx.fastmcp).get_chat(channel_id, chat_id)
+    if chat is None:
+        return None
 
     parts: list[ChatMessagePart] = []
     parts += [ChatMessageTextPart(content)]
@@ -126,6 +128,8 @@ async def list_messages(
     """
 
     chat = await cast(MCP, ctx.fastmcp).get_chat(channel_id, chat_id)
+    if chat is None:
+        return []
 
     date_from, date_to = _date_range(date_start=date_start, date_end=date_end, date_range=date_range)
 
