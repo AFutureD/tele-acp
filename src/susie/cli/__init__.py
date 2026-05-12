@@ -32,7 +32,7 @@ cli = typer.Typer(
     3. tele dialog list
     4. tele message list <dialog_id> -n 20
 
-    WARNING: DO NOT SUPPORT BOT FOR NOW.
+    WARNING: Bot accounts are not supported.
     """,
 )
 cli.add_typer(auth_cli, name="auth")

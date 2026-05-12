@@ -9,7 +9,7 @@
 
 ## Background
 
-`susie auth login` currently supports bot-token login and the standard phone/code flow for user accounts.
+`susie auth login` supports the standard phone/code flow for user accounts.
 
 Telegram and Telethon also support QR-based login for user accounts, which is useful when the operator already has an authenticated Telegram app on another device.
 
@@ -22,7 +22,6 @@ Add a CLI option to `susie auth login` that uses Telegram's QR-login flow for us
 ## Requirements
 
 - Add a `--qrcode` flag to `susie auth login`.
-- Keep `--bot` and `--qrcode` mutually exclusive.
 - Reuse the existing local-session creation and channel-config update behavior after a successful login.
 - Support accounts protected by Telegram Two-Step Verification by prompting for the password when required.
 - Document the new login mode in the main user docs.

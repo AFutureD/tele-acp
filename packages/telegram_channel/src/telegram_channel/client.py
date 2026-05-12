@@ -19,7 +19,7 @@ from telethon.types import PeerUser
 
 from .fmt import format_me
 from .session import TGSession, load_session, session_ensure_current_valid
-from .settings import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TypeTelegramChannel
+from .settings import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TelegramChannelSettings
 
 
 class TGClient(telethon.TelegramClient):
@@ -32,7 +32,7 @@ class TGClient(telethon.TelegramClient):
         return TGClient(session=session, api_id=api_id, api_hash=api_hash)
 
     @staticmethod
-    def create_as_login(api_id: int | None, api_hash: str | None, config: TypeTelegramChannel) -> TGClient:
+    def create_as_login(api_id: int | None, api_hash: str | None, config: TelegramChannelSettings) -> TGClient:
 
         session_name = config.session_name
         api_id = api_id or DEFAULT_TELEGRAM_API_ID
@@ -88,23 +88,6 @@ class TGClient(telethon.TelegramClient):
     ) -> telethon.types.User | None:
         try:
             result = self.start(phone=phone, password=password, code_callback=code)
-            if inspect.isawaitable(result):
-                await result
-            me = await self.get_me()
-
-            session_ensure_current_valid(session=self.session)
-
-            return me if isinstance(me, telethon.types.User) else None
-        except RPCError:
-            session_ensure_current_valid(session=None)
-            raise
-        except KeyboardInterrupt:
-            session_ensure_current_valid(session=None)
-            raise
-
-    async def login_as_bot(self, bot_token: str) -> telethon.types.User | None:
-        try:
-            result = self.start(bot_token=bot_token)
             if inspect.isawaitable(result):
                 await result
             me = await self.get_me()

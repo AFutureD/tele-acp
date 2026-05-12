@@ -6,7 +6,7 @@ from typing import Annotated, Any
 import qrcode
 import typer
 from rich import print
-from telegram_channel import TelegramBotChannel, TelegramUserChannel, TGClient, TGSession, format_me, session_switch
+from telegram_channel import TelegramChannelSettings, TGClient, TGSession, format_me, session_switch
 
 from susie.config import delete_channel_config, load_config, update_or_save_channel_config
 
@@ -61,7 +61,6 @@ def me_get(ctx: typer.Context) -> None:
 )
 def auth_login(
     ctx: typer.Context,
-    bot_token: Annotated[str | None, typer.Option("--bot", help="Login as bot using the provided bot token.")] = None,
     channel_id: Annotated[str | None, typer.Option("--id", help="Login as channel using the provided channel ID.")] = None,
     use_qrcode: Annotated[bool, typer.Option("--qrcode", help="Login as user through Telegram QR-login flow.")] = False,
     switch_as_current: Annotated[
@@ -70,9 +69,6 @@ def auth_login(
     ] = False,
 ):
     cli_args: SharedArgs = ctx.obj
-
-    if bot_token is not None and use_qrcode:
-        raise typer.BadParameter("Cannot combine --qrcode with --bot.")
 
     def get_phone() -> str:
         print(
@@ -136,9 +132,7 @@ def auth_login(
         )
 
         try:
-            if bot_token is not None:
-                me = await tele_client.login_as_bot(bot_token=bot_token)
-            elif use_qrcode:
+            if use_qrcode:
                 me = await tele_client.login_as_qrcode(password=get_password, on_qrcode=show_qrcode)
             else:
                 me = await tele_client.login_as_user(phone=get_phone, code=get_code, password=get_password)
@@ -158,10 +152,7 @@ def auth_login(
         session_name = Path(session.filename).stem
         id = channel_id or me.username or str(me.id)
 
-        if me.bot and bot_token:
-            channel = TelegramBotChannel(session_name=session_name, token=bot_token)
-        else:
-            channel = TelegramUserChannel(session_name=session_name)
+        channel = TelegramChannelSettings(session_name=session_name)
 
         update_or_save_channel_config(id, channel=channel, config_file=cli_args.config_file)
 

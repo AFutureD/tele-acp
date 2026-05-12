@@ -89,25 +89,13 @@ whitelist = []
 groups."*" = { whitelist = ["*"], only_mention = true }
 ```
 
-Example for a bot channel:
-
-```toml
-[channels.my_bot]
-type = "telegram_bot"
-session_name = "my_bot"
-token = "123456:example-token"
-whitelist = []
-groups."*" = { whitelist = ["*"], only_mention = true }
-```
-
 Notes:
 
 - `susie auth login` usually writes a user-channel configuration automatically.
 - `susie auth login --qrcode` uses Telegram's QR-login flow for user accounts and prints an ASCII QR code in the terminal.
 - `session_name` is the name of the local Telegram session.
 - `whitelist` limits which peer IDs or group IDs are allowed.
-- `allow_contacts` only applies to `telegram_user`.
-- `token` only applies to `telegram_bot`.
+- `allow_contacts` controls whether Telegram contacts are allowed.
 
 > [!NOTE]
 > We recommend using the `susie` CLI to modify channel settings.

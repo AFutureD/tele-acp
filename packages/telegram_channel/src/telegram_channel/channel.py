@@ -13,7 +13,7 @@ from telethon.tl.custom.dialog import Dialog as TeleDialog
 from telethon.types import MessageEntityBlockquote, TypeMessageEntity
 
 from .client import TGClient
-from .settings import TELEGRAM_PEER_ALL_INDICATOR, TelegramBotChannel, TelegramChannelGroupPolicy, TelegramUserChannel, TypeTelegramChannel
+from .settings import TELEGRAM_PEER_ALL_INDICATOR, TelegramChannelGroupPolicy, TelegramChannelSettings
 
 
 def peer_id_into_raw_int(peer_id: telethon.types.TypePeer) -> int:
@@ -148,7 +148,7 @@ class TelegramChannel(Channel):
         id: str,
         api_id: int | None,
         api_hash: str | None,
-        settings: TypeTelegramChannel,
+        settings: TelegramChannelSettings,
         message_handler: MessageHandler,
     ):
         tele_client = TGClient.create_as_login(api_id, api_hash, settings)
@@ -184,13 +184,15 @@ class TelegramChannel(Channel):
     async def send_message(self, message: ChatMessage):
         files: list[telethon.hints.FileLike] = [part.path for part in message.parts if isinstance(part, ChatMessageFilePart)]
         rich_text_sections = message.meta.get("rich_text_sections")
+        formatting_entities: list[TypeMessageEntity] | None
 
         if isinstance(rich_text_sections, list) and all(isinstance(item, dict) for item in rich_text_sections):
             content, formatting_entities = render_telegram_rich_text_sections(rich_text_sections)
         else:
             texts = [part.text for part in message.parts if isinstance(part, ChatMessageTextPart)]
             content = "\n".join(texts)
-            formatting_entities = message.meta.get("telegram_entities")
+            raw_formatting_entities = message.meta.get("telegram_entities")
+            formatting_entities = raw_formatting_entities if isinstance(raw_formatting_entities, list) else None
 
         receiver = message.receiver or message.chat_id
         peer_id = chat_id_into_peer_id(receiver)
@@ -198,7 +200,7 @@ class TelegramChannel(Channel):
         await self._tele_client.send_message(
             peer_id,
             message=content,
-            formatting_entities=formatting_entities if isinstance(formatting_entities, list) else None,
+            formatting_entities=formatting_entities,
             file=files if len(files) > 0 else None,
         )
         self.logger.info(f"send_message: {message}")
@@ -216,12 +218,8 @@ class TelegramChannel(Channel):
             return
 
         peer_id = message.peer_id
-        # if not isinstance(peer_id, telethon.types.PeerUser):  # hard-coded peer filter used during development
-        #     return
 
-        lifespan = self.build_message_lifespan(peer=peer_id, message_id=message.id) if not self.is_bot() else None
-
-        chat_message = convert_telegram_message_to_chat_message(self.id, message, lifespan=lifespan)
+        chat_message = convert_telegram_message_to_chat_message(self.id, message, lifespan=self.build_message_lifespan(peer=peer_id, message_id=message.id))
         await self.receive_message(chat_message)
 
     @contextlib.asynccontextmanager
@@ -242,7 +240,7 @@ class TelegramChannel(Channel):
         match peer_id:
             case telethon.types.PeerUser():
 
-                async def _is_admin(settings: TypeTelegramChannel, peer: telethon.types.PeerUser):
+                async def _is_admin(settings: TelegramChannelSettings, peer: telethon.types.PeerUser):
                     chat = message.chat
                     if not chat:
                         return False
@@ -250,8 +248,8 @@ class TelegramChannel(Channel):
                     admins = await self._tele_client.list_admin_user(chat)
                     return any(admin.id == peer.user_id for admin in admins)
 
-                async def _is_allowed_by_contact(settings: TypeTelegramChannel, peer: telethon.types.PeerUser) -> bool:
-                    if not isinstance(settings, TelegramUserChannel):
+                async def _is_allowed_by_contact(settings: TelegramChannelSettings, peer: telethon.types.PeerUser) -> bool:
+                    if not isinstance(settings, TelegramChannelSettings):
                         return False
 
                     if not settings.allow_contacts:
@@ -262,7 +260,7 @@ class TelegramChannel(Channel):
 
                     return match
 
-                def _is_allowed_by_white_list(settings: TypeTelegramChannel, peer: telethon.types.PeerUser) -> bool:
+                def _is_allowed_by_white_list(settings: TelegramChannelSettings, peer: telethon.types.PeerUser) -> bool:
                     whitelist = settings.whitelist
                     if whitelist is None:
                         return False
@@ -373,8 +371,3 @@ class TelegramChannel(Channel):
         messages = await self._tele_client.list_messages(peer_id, date_start=date_start, date_end=date_end, limit=num)
 
         return [convert_telegram_message_to_chat_message(channel_id=self.id, message=message) for message in messages]
-
-    def is_bot(self) -> bool:
-        if (settings := self.settings) and isinstance(settings, TelegramBotChannel):
-            return True
-        return False

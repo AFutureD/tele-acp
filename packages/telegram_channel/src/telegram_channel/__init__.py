@@ -6,19 +6,15 @@ from .settings import (
     DEFAULT_TELEGRAM_API_HASH,
     DEFAULT_TELEGRAM_API_ID,
     TELEGRAM_PEER_ALL_INDICATOR,
-    TelegramBotChannel,
     TelegramChannelGroupPolicy,
-    TelegramUserChannel,
-    TypeTelegramChannel,
+    TelegramChannelSettings,
 )
 
 __all__ = [
     "TelegramChannel",
     "TGClient",
-    "TelegramUserChannel",
-    "TelegramBotChannel",
-    "TypeTelegramChannel",
     "TGSession",
+    "TelegramChannelSettings",
     "get_app_session_current",
     "get_app_session_folder",
     "list_session_name",
@@ -31,5 +27,5 @@ __all__ = [
     "DEFAULT_TELEGRAM_API_ID",
     "DEFAULT_TELEGRAM_API_HASH",
     "TELEGRAM_PEER_ALL_INDICATOR",
-    "TelegramChannelGroupPolicy"
+    "TelegramChannelGroupPolicy",
 ]

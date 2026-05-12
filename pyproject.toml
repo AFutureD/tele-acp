@@ -38,6 +38,7 @@ dev = [
     "ruff==0.15.7",
     "ty==0.0.24",
     "types-dateparser>=1.4.0.20260328",
+    "types-qrcode>=8.2.0.20260508",
 ]
 
 [build-system]
@@ -72,6 +73,10 @@ docstring-code-format = true
 
 [tool.ruff.lint]
 extend-select = ["I"]
+
+[tool.mypy]
+check_untyped_defs = true
+packages = ["susie", "susie_core", "telegram_channel"]
 
 [[tool.mypy.overrides]]
 module = ["telethon.*"]

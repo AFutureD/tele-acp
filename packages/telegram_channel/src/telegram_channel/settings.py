@@ -1,6 +1,3 @@
-import enum
-from typing import TypeAlias
-
 from pydantic import BaseModel
 from pydantic.fields import Field
 from susie_core import ChannelSettings, ChannelType
@@ -19,13 +16,12 @@ class TelegramChannelGroupPolicy(BaseModel):
     only_mention: bool = Field(default=True, description="Whether only responses to mentioned messages")
 
 
-class TelegramChannelType(ChannelType, enum.Enum):
-    TELEGRAM_USER = "telegram_user"
-    TELEGRAM_BOT = "telegram_bot"
+class TelegramChannelSettings(ChannelSettings):
+    type: ChannelType = "telegram_user"
 
-
-class TelegramChannel(ChannelSettings):
     session_name: str = Field(description="The session name for the Telegram client")
+
+    allow_contacts: bool = Field(default=True, description="Whether to allow contacts")
 
     # will move to `users` and `TelegramChannelUserPolicy`, for now it's enough.
     whitelist: list[str] | None = Field(default=[], description="The list of allowed users. peer id")
@@ -34,18 +30,3 @@ class TelegramChannel(ChannelSettings):
         default={TELEGRAM_PEER_ALL_INDICATOR: TelegramChannelGroupPolicy()},
         description="The list of allowed groups",
     )
-
-
-class TelegramUserChannel(TelegramChannel):
-    type: ChannelType = TelegramChannelType.TELEGRAM_USER
-
-    allow_contacts: bool = Field(default=True, description="Whether to allow contacts")
-
-
-class TelegramBotChannel(TelegramChannel):
-    type: ChannelType = TelegramChannelType.TELEGRAM_BOT
-
-    token: str = Field(description="Telegram bot token")
-
-
-TypeTelegramChannel: TypeAlias = TelegramUserChannel | TelegramBotChannel

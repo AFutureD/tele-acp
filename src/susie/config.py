@@ -7,7 +7,7 @@ import tomlkit
 from pydantic import BaseModel, ValidationError, model_validator
 from pydantic.fields import Field
 from susie_core import DEFAULT_AGENT_ID, AgentConfig, ConfigError
-from telegram_channel import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TypeTelegramChannel
+from telegram_channel import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TelegramChannelSettings
 from tomlkit.exceptions import TOMLKitError
 from tomlkit.items import Table
 
@@ -26,7 +26,7 @@ class Config(BaseModel):
     api_id: int | None = Field(default=None, description="Telegram api_id")
     api_hash: str | None = Field(default=None, description="Telegram api_hash")
 
-    channels: dict[str, TypeTelegramChannel] = {}
+    channels: dict[str, TelegramChannelSettings] = {}
     agents: list[AgentConfig] = [AgentConfig(id=DEFAULT_AGENT_ID)]
     bindings: list[ChatSettings] = []
 
@@ -77,7 +77,7 @@ def load_config(config_file: Path | None = None) -> Config:
     return config
 
 
-def update_or_save_channel_config(channel_id: str, channel: TypeTelegramChannel, config_file: Path | None = None):
+def update_or_save_channel_config(channel_id: str, channel: TelegramChannelSettings, config_file: Path | None = None):
     config_file = config_file or get_config_default_path()
 
     if not config_file.exists():

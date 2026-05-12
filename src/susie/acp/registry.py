@@ -423,15 +423,15 @@ class ACPRegisteryManage:
     def _extract_archive(self, archive_path: Path, destination: Path) -> None:
         if zipfile.is_zipfile(archive_path):
             with zipfile.ZipFile(archive_path) as archive:
-                for member in archive.infolist():
-                    self._ensure_archive_path_safe(destination, member.filename)
+                for zip_member in archive.infolist():
+                    self._ensure_archive_path_safe(destination, zip_member.filename)
                 archive.extractall(destination)
             return
 
         if tarfile.is_tarfile(archive_path):
             with tarfile.open(archive_path) as archive:
-                for member in archive.getmembers():
-                    self._ensure_archive_path_safe(destination, member.name)
+                for tar_member in archive.getmembers():
+                    self._ensure_archive_path_safe(destination, tar_member.name)
                 archive.extractall(destination, filter="data")
             return
 
