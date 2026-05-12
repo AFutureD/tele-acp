@@ -11,6 +11,7 @@ dependencies = [
     # inner
     "susie-core>=0.1.0",
     "telegram-channel>=0.1.0",
+    "telegram-bot-channel>=0.1.0",
     # data model
     "aiohttp>=3.12.15",
     "pydantic>=2.12.5",
@@ -51,12 +52,14 @@ source-exclude = ["tests/**/*"]
 members = [
     "packages/susie_core",
     "packages/telegram_channel",
+    "packages/telegram_bot_channel",
 ]
 
 [tool.uv.sources]
 susie = { workspace = true }
 susie-core = { workspace = true }
 telegram-channel = { workspace = true }
+telegram-bot-channel = { workspace = true }
 
 [project.scripts]
 susie = "susie.cli:cli"

@@ -1,13 +1,12 @@
 import asyncio
 import io
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import qrcode
 import typer
 from rich import print
 from telegram_channel import TelegramBotChannel, TelegramUserChannel, TGClient, TGSession, format_me, session_switch
-from telethon.tl.custom.qrlogin import QRLogin
 
 from susie.config import delete_channel_config, load_config, update_or_save_channel_config
 
@@ -108,7 +107,7 @@ def auth_login(
         qr.print_ascii(out=buffer, tty=False, invert=True)
         return buffer.getvalue().rstrip()
 
-    def show_qrcode(qr_login: QRLogin) -> None:
+    def show_qrcode(qr_login: Any) -> None:
         expires_at = qr_login.expires.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
         qrcode_ascii = format_qrcode_ascii(qr_login.url)
 
