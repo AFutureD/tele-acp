@@ -39,6 +39,17 @@ whitelist = ["*"]
 # Weather only response to mentioned messages
 only_mention = true
 
+# Example: a Telegram Bot API channel.
+[channels.my_bot]
+type = "telegram_bot"
+token = "123456:bot-token"
+whitelist = ["*"]
+drop_pending_updates = false
+
+[channels.my_bot.groups."*"]
+whitelist = ["*"]
+only_mention = true
+
 [[agents]]
 # The ID of the agent.
 id = "default"
@@ -91,11 +102,31 @@ groups."*" = { whitelist = ["*"], only_mention = true }
 
 Notes:
 
-- `susie auth login` usually writes a user-channel configuration automatically.
-- `susie auth login --qrcode` uses Telegram's QR-login flow for user accounts and prints an ASCII QR code in the terminal.
+- `susie onboard telegram_user` usually writes a user-channel configuration automatically.
+- `susie onboard telegram_user --qrcode` uses Telegram's QR-login flow for user accounts and prints an ASCII QR code in the terminal.
 - `session_name` is the name of the local Telegram session.
 - `whitelist` limits which peer IDs or group IDs are allowed.
 - `allow_contacts` controls whether Telegram contacts are allowed.
+
+Example for a bot channel:
+
+```toml
+[channels.my_bot]
+type = "telegram_bot"
+token = "123456:bot-token"
+whitelist = ["*"]
+drop_pending_updates = false
+
+[channels.my_bot.groups."*"]
+whitelist = ["*"]
+only_mention = true
+```
+
+You can write this with:
+
+```bash
+susie onboard telegram_bot my_bot --token '<bot-token>'
+```
 
 > [!NOTE]
 > We recommend using the `susie` CLI to modify channel settings.

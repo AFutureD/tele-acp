@@ -1,3 +1,5 @@
+import logging
+
 from susie_core import DEFAULT_AGENT_ID, Chatable, ChatInfo, ChatMessage, Command
 
 from susie.channel.hub import ChannelHub
@@ -14,6 +16,7 @@ class ChatManager(Chatable):
         self._channel_hub = channel_hub
         self._replier_hub = replier_hub
         self._command_chain = command_chain
+        self.logger = logging.getLogger("ChatManager")
 
         self._chats: dict[tuple[str, str], Chat] = {}
 
@@ -45,7 +48,12 @@ class ChatManager(Chatable):
         binding = await self.get_binding(channel_id, chat_id)
 
         command_chain = CommandChain(self._command_chain)
-        replier = await self._replier_hub.build_replier(binding.agent, command_chain)
+        try:
+            self.logger.info(f"Chat {channel_id} ({chat_id}) building replier")
+            replier = await self._replier_hub.build_replier(binding.agent, command_chain)
+        except Exception as e:
+            self.logger.error(f"build replier failed. error: {e}")
+            raise
 
         chat = Chat(chat_id, channel, binding, replier, command_chain)
 

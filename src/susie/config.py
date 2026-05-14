@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Self
+from typing import Annotated, Self
 
 import tomlkit
 from pydantic import BaseModel, ValidationError, model_validator
 from pydantic.fields import Field
-from susie_core import DEFAULT_AGENT_ID, AgentConfig, ConfigError
+from susie_core import DEFAULT_AGENT_ID, AgentConfig, ChannelSettings, ConfigError
+from telegram_bot_channel import TelegramBotChannelSettings
 from telegram_channel import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TelegramChannelSettings
 from tomlkit.exceptions import TOMLKitError
-from tomlkit.items import Table
+from tomlkit.items import AoT, Table
 
 from .shared import get_app_user_config_dir
 
 SUSIE_CHAT_ALL_INDICATOR = "*"
+
+ChannelConfig = Annotated[TelegramChannelSettings | TelegramBotChannelSettings, Field(discriminator="type")]
 
 
 class ChatSettings(BaseModel):
@@ -26,9 +29,9 @@ class Config(BaseModel):
     api_id: int | None = Field(default=None, description="Telegram api_id")
     api_hash: str | None = Field(default=None, description="Telegram api_hash")
 
-    channels: dict[str, TelegramChannelSettings] = {}
-    agents: list[AgentConfig] = [AgentConfig(id=DEFAULT_AGENT_ID)]
-    bindings: list[ChatSettings] = []
+    channels: dict[str, ChannelConfig] = Field(default_factory=dict)
+    agents: list[AgentConfig] = Field(default_factory=lambda: [AgentConfig(id=DEFAULT_AGENT_ID)])
+    bindings: list[ChatSettings] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_bindings(self) -> Self:
@@ -77,30 +80,102 @@ def load_config(config_file: Path | None = None) -> Config:
     return config
 
 
-def update_or_save_channel_config(channel_id: str, channel: TelegramChannelSettings, config_file: Path | None = None):
+def _load_config_toml(config_file: Path | None = None):
     config_file = config_file or get_config_default_path()
-
     if not config_file.exists():
-        return
+        _ = load_config(config_file=config_file)
 
     config_text = config_file.read_text(encoding="utf-8")
-    data = tomlkit.loads(config_text)
+    return config_file, tomlkit.loads(config_text)
 
-    channels = data.get("channels")
 
-    if not isinstance(channels, Table):  # create channels entry if not exists
-        raise ConfigError("Invalid channels entry.")
+def _save_config_toml(data, config_file: Path) -> None:
+    with open(config_file, "w", encoding="utf-8") as f:
+        tomlkit.dump(data, f)
+
+
+def _require_table(data, key: str) -> Table:
+    table = data.get(key)
+    if not isinstance(table, Table):
+        table = tomlkit.table()
+        data[key] = table
+    return table
+
+
+def _ensure_aot(data, key: str) -> AoT:
+    item = data.get(key)
+    if isinstance(item, AoT):
+        return item
+
+    aot = tomlkit.aot()
+    if isinstance(item, list):
+        for old_item in item:
+            if not isinstance(old_item, dict):
+                continue
+            table = tomlkit.table()
+            for old_key, old_value in old_item.items():
+                table[old_key] = old_value
+            aot.append(table)
+
+    data[key] = aot
+    return aot
+
+
+def update_api_config(api_id: int | None = None, api_hash: str | None = None, config_file: Path | None = None) -> None:
+    config_file, data = _load_config_toml(config_file)
+
+    if api_id is not None:
+        data["api_id"] = api_id
+    if api_hash is not None:
+        data["api_hash"] = api_hash
+
+    Config.model_validate(data)
+    _save_config_toml(data, config_file)
+
+
+def update_or_save_channel_config(channel_id: str, channel: ChannelSettings, config_file: Path | None = None) -> None:
+    config_file, data = _load_config_toml(config_file)
+    channels = _require_table(data, "channels")
 
     channel_item = tomlkit.item(channel.model_dump(mode="json", exclude_none=True))
     channels[channel_id] = channel_item
 
     data["channels"] = channels
 
-    with open(config_file, "w", encoding="utf-8") as f:
-        tomlkit.dump(data, f)
+    Config.model_validate(data)
+    _save_config_toml(data, config_file)
 
 
-def delete_channel_config(session_name: str, config_file: Path | None = None):
+def upsert_binding_config(channel_id: str, agent_id: str = DEFAULT_AGENT_ID, chat_ids: list[str] | None = None, config_file: Path | None = None) -> None:
+    config_file, data = _load_config_toml(config_file)
+    bindings = _ensure_aot(data, "bindings")
+
+    if not isinstance(chat_ids, list):
+        chat_ids = [SUSIE_CHAT_ALL_INDICATOR]
+
+    target = None
+    for item in bindings:
+        if item.get("channel") != channel_id:
+            continue
+        raw_chat_ids = item.get("chat_ids", [SUSIE_CHAT_ALL_INDICATOR])
+        existing_chat_ids = [raw_chat_ids] if isinstance(raw_chat_ids, str) else list(raw_chat_ids)
+        if existing_chat_ids == chat_ids:
+            target = item
+            break
+
+    if target is None:
+        target = tomlkit.table()
+        bindings.append(target)
+
+    target["channel"] = channel_id
+    target["agent"] = agent_id
+    target["chat_ids"] = chat_ids
+
+    Config.model_validate(data)
+    _save_config_toml(data, config_file)
+
+
+def delete_channel_config_by_id(channel_id: str, config_file: Path | None = None) -> None:
     config_file = config_file or get_config_default_path()
 
     if not config_file.exists():
@@ -114,13 +189,26 @@ def delete_channel_config(session_name: str, config_file: Path | None = None):
     if not isinstance(channels, Table):  # create channels entry if not exists
         raise ConfigError("Invalid channels entry.")
 
-    for key, item in channels.items():
-        if item.get("session_name") != session_name:
-            continue
-        channels.pop(key)
-        break
+    channels.pop(channel_id, None)
 
     data["channels"] = channels
 
     with open(config_file, "w", encoding="utf-8") as f:
         tomlkit.dump(data, f)
+
+
+def delete_channel_config(session_name: str, config_file: Path | None = None) -> None:
+    delete_channel_config_by_session_name(session_name=session_name, config_file=config_file)
+
+
+def delete_channel_config_by_session_name(session_name: str, config_file: Path | None = None) -> None:
+    config_file, data = _load_config_toml(config_file)
+    channels = _require_table(data, "channels")
+
+    for key, item in list(channels.items()):
+        if item.get("session_name") == session_name:
+            channels.pop(key)
+            break
+
+    Config.model_validate(data)
+    _save_config_toml(data, config_file)

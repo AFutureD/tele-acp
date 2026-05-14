@@ -76,7 +76,7 @@ extend-select = ["I"]
 
 [tool.mypy]
 check_untyped_defs = true
-packages = ["susie", "susie_core", "telegram_channel"]
+packages = ["susie", "susie_core", "telegram_channel", "telegram_bot_channel"]
 
 [[tool.mypy.overrides]]
 module = ["telethon.*"]

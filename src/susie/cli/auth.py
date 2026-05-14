@@ -1,15 +1,14 @@
 import asyncio
-import io
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
-import qrcode
 import typer
 from rich import print
-from telegram_channel import TelegramChannelSettings, TGClient, TGSession, format_me, session_switch
+from telegram_channel import TGClient, TGSession, format_me
 
-from susie.config import delete_channel_config, load_config, update_or_save_channel_config
+from susie.config import delete_channel_config_by_session_name, load_config
 
+from .onboard import onboard_telegram_user_channel
 from .shared import SharedArgs
 
 auth_cli = typer.Typer(
@@ -70,96 +69,17 @@ def auth_login(
 ):
     cli_args: SharedArgs = ctx.obj
 
-    def get_phone() -> str:
-        print(
-            """
-            Telegram login requires your phone number.
-
-            1. Enter your Telegram phone number with [bold green]country code[/bold green].
-            2. Telegram will send a [bold green]login[/bold green] code to your Telegram app (from the official [bold red]Telegram account[/bold red]).
-            3. Enter that [bold green]code[/bold green] in the next step.
-            4. Your [bold green]password[/bold green] will be asked, if Two-Step Verification is enabled (Settings → Privacy and Security).
-
-            [bold red]IMPORTANT: Your input will not be stored or shared.[/bold red]
-
-            Example: 8615306541234
-
-            """
+    ok = asyncio.run(
+        onboard_telegram_user_channel(
+            cli_args=cli_args,
+            channel_id=channel_id,
+            use_qrcode=use_qrcode,
+            switch_as_current=switch_as_current,
+            bind=False,
+            agent_id="default",
+            chat_ids=["*"],
         )
-
-        return typer.prompt("Please enter phone number", type=str)
-
-    def get_code() -> str:
-        return typer.prompt("Please enter login code", type=str)
-
-    def get_password() -> str:
-        return typer.prompt("Please enter your password", type=str, hide_input=True)
-
-    def format_qrcode_ascii(data: str) -> str:
-        buffer = io.StringIO()
-        qr = qrcode.QRCode(border=1)
-        qr.add_data(data)
-        qr.make(fit=True)
-        qr.print_ascii(out=buffer, tty=False, invert=True)
-        return buffer.getvalue().rstrip()
-
-    def show_qrcode(qr_login: Any) -> None:
-        expires_at = qr_login.expires.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
-        qrcode_ascii = format_qrcode_ascii(qr_login.url)
-
-        print(
-            f"""
-            Telegram QR login requires a Telegram app that is [bold green]already logged in[/bold green].
-
-            1. Open Telegram on another logged-in device.
-            2. Open the login-by-QR flow in Telegram and scan the ASCII QR code below.
-            3. Approve the login request in Telegram.
-            4. Your [bold green]password[/bold green] will be asked if Two-Step Verification is enabled.
-
-            [bold red]IMPORTANT: This login payload expires at {expires_at}.[/bold red]
-            """
-        )
-        typer.echo(qrcode_ascii)
-        print(f"\nRaw login URL: [bold cyan]{qr_login.url}[/bold cyan]")
-
-    async def _run() -> bool:
-        config = load_config(config_file=cli_args.config_file)
-        tele_client = TGClient.create_simple(
-            config.api_id,
-            config.api_hash,
-            cli_args.session,
-            with_current=False,
-        )
-
-        try:
-            if use_qrcode:
-                me = await tele_client.login_as_qrcode(password=get_password, on_qrcode=show_qrcode)
-            else:
-                me = await tele_client.login_as_user(phone=get_phone, code=get_code, password=get_password)
-        except Exception as e:
-            print(f"Login failed: {e}")
-            return False
-
-        if not me:
-            return False
-
-        session = tele_client.session
-        assert isinstance(session, TGSession), "Session must be a TGSession"
-
-        if switch_as_current:
-            session_switch(session=session)
-
-        session_name = Path(session.filename).stem
-        id = channel_id or me.username or str(me.id)
-
-        channel = TelegramChannelSettings(session_name=session_name)
-
-        update_or_save_channel_config(id, channel=channel, config_file=cli_args.config_file)
-
-        print(f"Hi {format_me(me)}")
-        return True
-
-    ok = asyncio.run(_run())
+    )
     if not ok:
         raise typer.Exit(code=1)
 
@@ -185,7 +105,7 @@ def auth_logout(ctx: typer.Context):
         async with tele_client:
             me = await tele_client.logout()
 
-        delete_channel_config(session_name=session_name, config_file=cli_args.config_file)
+        delete_channel_config_by_session_name(session_name=session_name, config_file=cli_args.config_file)
 
         if me:
             print(f"Bye {format_me(me)}")

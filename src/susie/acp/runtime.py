@@ -7,7 +7,7 @@ from typing import AsyncIterator, Self
 
 import acp
 from acp.schema import SessionConfigOption, SessionConfigSelectOption
-from susie_core import AgentConfig
+from susie_core import AgentConfig, ChatAwareError
 
 from susie.config import Config
 from susie.shared import get_app_user_config_dir
@@ -112,6 +112,7 @@ class ACPAgentRuntime(ACPAgentConnection):
             await self.connection.prompt(prompt=prompt, session_id=session_id)
         except acp.RequestError as e:
             self.logger.error(f"Failed to prompt: {e.to_error_obj()}")
+            raise ChatAwareError(f"Failed to prompt: {e.to_error_obj()}")
 
         await self.connection.cancel(session_id)
 

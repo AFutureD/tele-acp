@@ -6,7 +6,7 @@
 
 **Chat with agents on Telegram through ACP.**
 
-This project lets agents handle Telegram requests on my behalf through my personal account rather than through a bot.
+This project lets agents handle Telegram requests on my behalf through Telegram user-account channels or Bot API channels.
 
 > [!CAUTION]
 > This project is under active development.
@@ -19,15 +19,21 @@ This project lets agents handle Telegram requests on my behalf through my person
 uv tool install git+https://github.com/AFutureD/susie
 ```
 
-### 2. Log in to Telegram
+### 2. Onboard a Telegram channel
 
-To let Susie receive messages from Telegram, you need to log in first.
+To let Susie receive messages from Telegram, onboard at least one channel first.
 This will also update the channel settings in the configuration file.
 
 ```bash
-susie auth login
-susie auth login --qrcode  # print an ASCII QR code in the terminal
+susie onboard telegram_user
+susie onboard telegram_user --qrcode  # print an ASCII QR code in the terminal
 susie auth me
+```
+
+For a Telegram bot:
+
+```bash
+susie onboard telegram_bot my_bot --token '<bot-token>'
 ```
 
 ### 3. Start the service

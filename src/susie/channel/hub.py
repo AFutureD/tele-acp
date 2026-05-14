@@ -4,7 +4,8 @@ import logging
 from typing import AsyncIterator, Self
 
 from susie_core import Channel, ChatMessage
-from telegram_channel import TelegramChannel
+from telegram_bot_channel import TelegramBotChannel, TelegramBotChannelSettings
+from telegram_channel import TelegramChannel, TelegramChannelSettings
 
 from susie.config import Config
 from susie.router import Router
@@ -20,7 +21,13 @@ class ChannelHub:
         self._channels: dict[str, Channel] = {}
 
         for channel_id, channel_settings in self._config.channels.items():
-            channel = TelegramChannel(channel_id, self._config.api_id, self._config.api_hash, channel_settings, self._on_receive_new_message)
+            channel: Channel
+            if isinstance(channel_settings, TelegramChannelSettings):
+                channel = TelegramChannel(channel_id, self._config.api_id, self._config.api_hash, channel_settings, self._on_receive_new_message)
+            elif isinstance(channel_settings, TelegramBotChannelSettings):
+                channel = TelegramBotChannel(channel_id, channel_settings, self._on_receive_new_message)
+            else:
+                raise RuntimeError(f"unsupported channel type: {channel_settings.type}")
             self._channels[channel.id] = channel
 
     def set_router(self, router: Router) -> None:

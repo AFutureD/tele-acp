@@ -13,6 +13,7 @@ from susie.logger import configure_logging
 from .acp import acp_cli
 from .auth import auth_cli
 from .mainloop import mainloop
+from .onboard import onboard_cli
 from .shared import SharedArgs
 
 cli = typer.Typer(
@@ -27,16 +28,15 @@ cli = typer.Typer(
 
     Quick Start:
 
-    1. tele auth login
-    2. tele auth me
+    1. susie onboard telegram_user
+    2. susie auth me
     3. tele dialog list
     4. tele message list <dialog_id> -n 20
-
-    WARNING: Bot accounts are not supported.
     """,
 )
 cli.add_typer(auth_cli, name="auth")
 cli.add_typer(acp_cli, name="acp")
+cli.add_typer(onboard_cli, name="onboard")
 
 
 def _version_callback(value: bool) -> None:
