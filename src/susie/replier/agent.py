@@ -26,12 +26,8 @@ PROMPT = (
 
 
 def convert_acp_message_to_chat_message(channel_id: str, chat_id: str, message: AcpMessage) -> ChatMessage:
-    text = message.markdown()
-    parts: list[ChatMessagePart] = [ChatMessageTextPart(text)] if text else []
-    rich_text_sections = message.rich_text_sections()
-    meta = {"rich_text_sections": rich_text_sections} if rich_text_sections else {}
-
-    return ChatMessage(id=None, channel_id=channel_id, chat_id=chat_id, receiver=None, reply_to=None, out=False, mute=False, parts=parts, meta=meta)
+    parts = message.chat_message_parts()
+    return ChatMessage(id=None, channel_id=channel_id, chat_id=chat_id, receiver=None, reply_to=None, out=False, mute=False, parts=parts)
 
 
 class AgentReplier(ChatCommandResponder):

@@ -6,7 +6,7 @@ from typing import AsyncIterator, Awaitable, Callable, Self
 
 import telethon
 import telethon.hints
-from susie_core import Channel, ChatInfo, ChatMessage, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart, unreachable
+from susie_core import Channel, ChatInfo, ChatMessage, ChatMessageBlockQuote, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart, unreachable
 from telethon.extensions import markdown as telegram_markdown
 from telethon.tl.custom import Message as TeleMessage
 from telethon.tl.custom.dialog import Dialog as TeleDialog
@@ -183,24 +183,40 @@ class TelegramChannel(Channel):
 
     async def send_message(self, message: ChatMessage):
         files: list[telethon.hints.FileLike] = [part.path for part in message.parts if isinstance(part, ChatMessageFilePart)]
-        rich_text_sections = message.meta.get("rich_text_sections")
-        formatting_entities: list[TypeMessageEntity] | None
+        entities: list[TypeMessageEntity] = []
 
-        if isinstance(rich_text_sections, list) and all(isinstance(item, dict) for item in rich_text_sections):
-            content, formatting_entities = render_telegram_rich_text_sections(rich_text_sections)
-        else:
-            texts = [part.text for part in message.parts if isinstance(part, ChatMessageTextPart)]
-            content = "\n".join(texts)
-            raw_formatting_entities = message.meta.get("telegram_entities")
-            formatting_entities = raw_formatting_entities if isinstance(raw_formatting_entities, list) else None
+        msg = ""
+        offset = 0
+        for part in message.parts:
+            match part:
+                case ChatMessageTextPart():
+                    mode = telethon.utils.sanitize_parse_mode("md")
+                    text, parts = mode.parse(part.text)
+
+                    msg += text
+                    entities.extend(parts)
+                    offset += len(text)
+
+                case ChatMessageBlockQuote():
+                    text = f"{part.title}\n{part.body}"
+
+                    msg += text
+                    entities.append(MessageEntityBlockquote(offset=offset, length=len(text), collapsed=True))
+                    offset += len(text)
+
+                case ChatMessageFilePart():
+                    pass
+
+            msg += "\n"
+            offset += 2
 
         receiver = message.receiver or message.chat_id
         peer_id = chat_id_into_peer_id(receiver)
 
         await self._tele_client.send_message(
             peer_id,
-            message=content,
-            formatting_entities=formatting_entities,
+            message=msg,
+            formatting_entities=entities,
             file=files if len(files) > 0 else None,
         )
         self.logger.info(f"send_message: {message}")

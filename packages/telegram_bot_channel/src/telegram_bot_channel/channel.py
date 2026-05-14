@@ -7,9 +7,9 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
 from typing import Self
 
-from susie_core import ChatInfo, ChatMessage, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart
+from susie_core import ChatInfo, ChatMessage, ChatMessageBlockQuote, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart
 from telegram import Message, MessageEntity, Update
-from telegram.constants import ChatAction
+from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, MessageHandler, filters
 
 from .settings import TELEGRAM_BOT_CHAT_ALL_INDICATOR, TelegramBotChannelGroupPolicy, TelegramBotChannelSettings
@@ -103,17 +103,32 @@ class TelegramBotChannel:
             await self._application.shutdown()
 
     async def send_message(self, message: ChatMessage) -> None:
-        texts = [part.text for part in message.parts if isinstance(part, ChatMessageTextPart)]
-        content = "\n".join(texts)
         files = [part.path for part in message.parts if isinstance(part, ChatMessageFilePart)]
         receiver = message.receiver or message.chat_id
         reply_to_message_id = int(message.reply_to) if message.reply_to and message.reply_to.isdecimal() else None
 
-        if content:
+        msg = ""
+        for part in message.parts:
+            match part:
+                case ChatMessageTextPart():
+                    msg += part.text
+
+                case ChatMessageBlockQuote():
+                    # https://core.telegram.org/bots/api#html-style
+                    text = f"<blockquote expandable>{part.title}\n{part.body}</blockquote>"
+
+                    msg += text
+
+                case ChatMessageFilePart():
+                    pass
+
+            msg += "\n"
+
+        if msg:
             await self._application.bot.send_message(
                 chat_id=receiver,
-                text=content,
-                disable_notification=message.mute,
+                text=msg,
+                parse_mode=ParseMode.HTML,
                 reply_to_message_id=reply_to_message_id,
             )
 
@@ -122,7 +137,6 @@ class TelegramBotChannel:
                 await self._application.bot.send_document(
                     chat_id=receiver,
                     document=file,
-                    disable_notification=message.mute,
                     reply_to_message_id=reply_to_message_id,
                 )
 
