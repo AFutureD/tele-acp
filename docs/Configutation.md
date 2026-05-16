@@ -5,7 +5,7 @@
 Susie's all settings are stored under `~/.config/susie/`.
 
 - configuration: `~/.config/susie/config.toml`
-- agent workspace: `~/.config/susie/workspace/<agent_id>/`
+- assistant workspace: `~/.config/susie/workspace/<assistant_id>/`
 
 ## 2. Default Configuration
 
@@ -50,39 +50,41 @@ drop_pending_updates = false
 whitelist = ["*"]
 only_mention = true
 
-[[agents]]
-# The ID of the agent.
-id = "default"
+[[assistants]]
+# The ID of the assistant.
+assistant_id = "default"
 
-# The ACP client ID used by this agent.
-acp_id = "codex"
+# The agent runtime ID used by this assistant.
+# "codex" uses Codex app-server through the official openai-codex SDK.
+# Other values are resolved through the ACP registry.
+agent_id = "codex"
 
-# Example: bind all chats on `my_account` to the default agent.
+# Example: bind all chats on `my_account` to the default assistant.
 [[bindings]]
 channel = "my_account"
-agent = "default"
+assistant_id = "default"
 chat_ids = ["*"]
 ```
 
 ## 3. FAQ
 
-### 3.1 How do I configure an agent working directory?
+### 3.1 How do I configure an assistant working directory?
 
-You can set an agent's working directory with `work_dir` inside `[[agents]]`.
+You can set an assistant's working directory with `work_dir` inside `[[assistants]]`.
 
 Example:
 
 ```toml
-[[agents]]
-id = "default"
-acp_id = "codex"
+[[assistants]]
+assistant_id = "default"
+agent_id = "codex"
 work_dir = "/absolute/path/to/your/project"
 ```
 
-If `work_dir` is not set, Susie will automatically use the default directory for that agent:
+If `work_dir` is not set, Susie will automatically use the default directory for that assistant:
 
 ```text
-~/.config/susie/workspace/<agent_id>/
+~/.config/susie/workspace/<assistant_id>/
 ```
 
 ### 3.2 How do I configure a channel?
@@ -137,61 +139,62 @@ susie onboard telegram_bot my_bot --token '<bot-token>'
 > [!CAUTION]
 > This is not fully supported yet and is still under development.
 
-`bindings` are used to connect a channel to an agent.
+`bindings` are used to connect a channel to an assistant.
 
 The simplest example:
 
 ```toml
 [[bindings]]
 channel = "my_account"
-agent = "default"
+assistant_id = "default"
 ```
 
-If you define multiple agents, you can assign them by channel:
+If you define multiple assistants, you can assign them by channel:
 
 ```toml
-[[agents]]
-id = "ops"
-acp_id = "codex"
+[[assistants]]
+assistant_id = "ops"
+agent_id = "codex"
 work_dir = "/absolute/path/to/ops-workspace"
 
 [[bindings]]
 channel = "my_account"
-agent = "ops"
+assistant_id = "ops"
 ```
 
-You can also bind specific chats to a different agent:
+You can also bind specific chats to a different assistant:
 
 ```toml
 [[bindings]]
 channel = "my_account"
 chat_ids = ["123456789", "G987654321"]
-agent = "ops"
+assistant_id = "ops"
 
 [[bindings]]
 channel = "my_account"
-agent = "default"
+assistant_id = "default"
 ```
 
 Notes:
 
 - `channel` must match the key used in `[channels.<id>]`, not `session_name`.
 - `chat_ids` is optional. When present, the binding only matches those chats. A single `chat_id` value is also accepted and normalized to `chat_ids = ["..."]`.
-- `agent` must reference an agent ID already defined in `[[agents]]`.
+- `assistant_id` must reference an assistant ID already defined in `[[assistants]]`.
 - Bindings first try to match `channel + chat_ids`, then fall back to the first binding that matches only `channel`.
-- If no binding matches, Susie falls back to the `default` agent for that channel.
+- If no binding matches, Susie falls back to the `default` assistant for that channel.
 
-### 3.4 How do I change the ACP client used by an agent?
+### 3.4 How do I change the agent runtime used by an assistant?
 
-Set `acp_id` in the corresponding `[[agents]]` entry:
+Set `agent_id` in the corresponding `[[assistants]]` entry:
 
 ```toml
-[[agents]]
-id = "default"
-acp_id = "codex"
+[[assistants]]
+assistant_id = "default"
+agent_id = "codex"
 ```
 
-Currently supported values are `codex` and `kimi`.
+`agent_id = "codex"` uses Codex app-server through the official `openai-codex` SDK.
+Other values are treated as ACP registry IDs, such as `codex-acp` or `kimi`.
 
 > [!NOTE]
-> [ACP Registry](https://github.com/agentclientprotocol/registry) is on the roadmap.
+> The ACP registry remains available for non-`codex` agent runtimes.

@@ -24,7 +24,7 @@ cli = typer.Typer(
     help="""
     Tele-ACP
 
-    Chat with agents on Telegram through ACP.
+    Chat with agents on Telegram through ACP and Codex app-server.
 
     Quick Start:
 

@@ -70,11 +70,11 @@ class AcpMessage(BaseModel):
                     )
 
                     status = chunk.status
-                    title = chunk.title
+                    title = chunk.title or ""
                     content = str(chunk.content)
 
                     if (chunk.title is None or chunk.title == "") and the_tool_start_chunk is not None:
-                        title = the_tool_start_chunk.title
+                        title = the_tool_start_chunk.title or title
 
                     ret.append(ChatMessageBlockQuote(f"[{status}] {title}", content))
 

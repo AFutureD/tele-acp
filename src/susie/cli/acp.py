@@ -8,8 +8,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from susie.acp.models import ACPRegistry, ACPRegistryAgent
-from susie.acp.registry import ACPRegisteryManage, ACPRegisteryStatus, ACPRegistryCache
+from susie.agent.acp.models import ACPRegistry, ACPRegistryAgent
+from susie.agent.acp.registry import ACPRegisteryManage, ACPRegisteryStatus, ACPRegistryCache
 
 acp_cli = typer.Typer(
     no_args_is_help=True,

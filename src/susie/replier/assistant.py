@@ -1,11 +1,10 @@
 import logging
-from typing import AsyncIterator
 
 import jinja2
-from susie_core import AgentConfig, Chatable, ChatCommandResponder, ChatMessage, ChatMessagePart, ChatMessageTextPart, Command
+from susie_core import AssistantConfig, Chatable, ChatCommandResponder, ChatMessage, ChatMessagePart, ChatMessageTextPart, Command
 
-from susie.acp import ACPAgentRuntime, AcpMessage
-from susie.agents import get_agents_dir
+from susie.agent import AcpMessage, AgentRuntime, CodexSDKMessage
+from susie.assistants import get_agents_dir
 from susie.constant import SUSIE_MCP_NAME
 
 PROMPT = (
@@ -25,13 +24,13 @@ PROMPT = (
 )
 
 
-def convert_acp_message_to_chat_message(channel_id: str, chat_id: str, message: AcpMessage) -> ChatMessage:
-    parts = message.chat_message_parts()
+def convert_agent_message_to_chat_message(channel_id: str, chat_id: str, message: AcpMessage | CodexSDKMessage) -> ChatMessage:
+    parts: list[ChatMessagePart] = message.chat_message_parts()
     return ChatMessage(id=None, channel_id=channel_id, chat_id=chat_id, receiver=None, reply_to=None, out=False, mute=False, parts=parts)
 
 
-class AgentReplier(ChatCommandResponder):
-    def __init__(self, settings: AgentConfig, acp_runtime: ACPAgentRuntime):
+class AssistantReplier(ChatCommandResponder):
+    def __init__(self, settings: AssistantConfig, acp_runtime: AgentRuntime):
         self.settings = settings
         self._acp_runtime = acp_runtime
         self.logger = logging.getLogger(__name__)
@@ -58,6 +57,8 @@ class AgentReplier(ChatCommandResponder):
 
         if value is None:
             current = await self._acp_runtime.model()
+            if not opts:
+                return f"current: {current}\n\nNo model options available for this runtime."
             lines = [f"{x.value}: {x.name}" for x in opts]
 
             return f"current: {current}\n\n" + ("\n".join(lines))
@@ -92,10 +93,10 @@ class AgentReplier(ChatCommandResponder):
         await self._acp_runtime.cancel()  # TODO: check time delta
 
         # start prompt request
-        stream: AsyncIterator[AcpMessage] = self._acp_runtime.prompt(prompt)
+        stream = self._acp_runtime.prompt(prompt)
         async for delta in stream:
             if (stop_reason := delta.stop_reason) and stop_reason != "cancelled":
-                msg = convert_acp_message_to_chat_message(message.channel_id, message.chat_id, delta)
+                msg = convert_agent_message_to_chat_message(message.channel_id, message.chat_id, delta)
                 if (forward_to := self.settings.forward_to) and forward_to != "":
                     msg.receiver = forward_to
                 await chat.send_message(msg)

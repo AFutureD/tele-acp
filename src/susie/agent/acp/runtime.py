@@ -7,8 +7,9 @@ from typing import AsyncIterator, Self
 
 import acp
 from acp.schema import SessionConfigOption, SessionConfigSelectOption
-from susie_core import AgentConfig, ChatAwareError
+from susie_core import AgentModelOption, AssistantConfig, ChatAwareError
 
+from susie.agent.runtime import AgentRuntime
 from susie.config import Config
 from susie.shared import get_app_user_config_dir
 
@@ -33,7 +34,7 @@ def get_agent_work_dir(id: str) -> Path:
 MODEL_CONFIG_ID = "model"
 
 
-class ACPAgentRuntime(ACPAgentConnection):
+class ACPAgentRuntime(ACPAgentConnection, AgentRuntime):
     """spawn acp client based on ACPAgentConfig and maintain sessions"""
 
     def __init__(
@@ -217,7 +218,7 @@ class ACPAgentRuntime(ACPAgentConnection):
 
         return option.root.current_value
 
-    async def list_model_opts(self) -> list[SessionConfigSelectOption]:
+    async def list_model_opts(self) -> list[AgentModelOption]:
         session_options = self.session_options
         if session_options is None:
             return []
@@ -231,9 +232,9 @@ class ACPAgentRuntime(ACPAgentConnection):
         # TODO: support SessionConfigSelectGroup
         selects = [x for x in selects if isinstance(x, SessionConfigSelectOption)]
 
-        return selects
+        return [AgentModelOption(value=select.value, name=select.name) for select in selects]
 
-    async def set_model(self, value) -> bool:
+    async def set_model(self, value: str) -> bool:
         session_id = self.session_id
         if session_id is None:
             return False
@@ -268,14 +269,14 @@ class ACPRuntimeHub:
         self._runtimes: dict[str, ACPAgentRuntime] = {}
         self._acp_manager = ACPRegisteryManage(acp_registry)
 
-    async def spawn_acp_runtime(self, agent: AgentConfig) -> ACPAgentRuntime:
+    async def spawn_acp_runtime(self, assistant: AssistantConfig) -> ACPAgentRuntime:
         assert self._stack is not None
 
-        acp_config = await self.get_acp_config(agent.acp_id)
+        acp_config = await self.get_acp_config(assistant.agent_id)
         assert acp_config is not None, "acp agent not found"
 
         id = str(uuid.uuid4())
-        runtime = ACPAgentRuntime(id, acp_config, cwd=agent.work_dir or get_agent_work_dir(agent.id), mcp_servers=self._mcp_servers)
+        runtime = ACPAgentRuntime(id, acp_config, cwd=assistant.work_dir or get_agent_work_dir(assistant.assistant_id), mcp_servers=self._mcp_servers)
         await self._stack.enter_async_context(runtime)
         self._runtimes[id] = runtime
 

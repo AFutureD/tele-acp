@@ -1,12 +1,10 @@
 import asyncio
 import contextlib
-import errno
 import logging
-import socket
 
 import acp
 
-from susie.acp import ACPRegistryCache, ACPRuntimeHub
+from susie.agent import ACPRegistryCache, ACPRuntimeHub
 from susie.channel import ChannelHub
 from susie.chat import ChatManager
 from susie.command import command_chain
@@ -68,8 +66,9 @@ class APP:
 
     async def startup(self) -> None:
         async with contextlib.AsyncExitStack() as stack:
-            await stack.enter_async_context(self._channel_hub.run())
             await stack.enter_async_context(self._acp_hub.run())
+            await stack.enter_async_context(self._replier_hub)
+            await stack.enter_async_context(self._channel_hub.run())
 
             group = await stack.enter_async_context(asyncio.TaskGroup())
             group.create_task(self._mcp_server.start())

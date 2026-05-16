@@ -8,7 +8,7 @@ from typing import Annotated, Any
 import qrcode
 import typer
 from rich import print
-from susie_core import DEFAULT_AGENT_ID
+from susie_core import DEFAULT_ASSISTANT_ID
 from telegram_bot_channel import TelegramBotChannelSettings
 from telegram_channel import TelegramChannelSettings, TGClient, TGSession, format_me, session_switch
 
@@ -86,7 +86,7 @@ async def onboard_telegram_user_channel(
     use_qrcode: bool,
     switch_as_current: bool,
     bind: bool,
-    agent_id: str,
+    assistant_id: str,
     chat_ids: list[str],
 ) -> bool:
     config = load_config(config_file=cli_args.config_file)
@@ -121,7 +121,7 @@ async def onboard_telegram_user_channel(
 
     update_or_save_channel_config(resolved_channel_id, channel=channel, config_file=cli_args.config_file)
     if bind:
-        upsert_binding_config(resolved_channel_id, agent_id=agent_id, chat_ids=chat_ids, config_file=cli_args.config_file)
+        upsert_binding_config(resolved_channel_id, assistant_id=assistant_id, chat_ids=chat_ids, config_file=cli_args.config_file)
 
     print(f"Onboarded telegram_user channel `{resolved_channel_id}` for {format_me(me)}")
     return True
@@ -146,7 +146,7 @@ def telegram_user(
         typer.Option("--switch", "-s", help="Automatic set the login session as active one."),
     ] = False,
     bind: Annotated[bool, typer.Option("--bind/--no-bind", help="Create or update a default binding for this channel.")] = True,
-    agent_id: Annotated[str, typer.Option("--agent", help="Agent id used by the default binding.")] = DEFAULT_AGENT_ID,
+    assistant_id: Annotated[str, typer.Option("--assistant", help="Assistant id used by the default binding.")] = DEFAULT_ASSISTANT_ID,
     chat_ids: Annotated[list[str] | None, typer.Option("--chat-id", help="Chat id matched by the default binding.")] = None,
 ) -> None:
     cli_args: SharedArgs = ctx.obj
@@ -158,7 +158,7 @@ def telegram_user(
             use_qrcode=use_qrcode,
             switch_as_current=switch_as_current,
             bind=bind,
-            agent_id=agent_id,
+            assistant_id=assistant_id,
             chat_ids=chat_ids or ["*"],
         )
     )
@@ -178,7 +178,7 @@ def telegram_bot(
     token: Annotated[str | None, typer.Option("--token", help="Telegram Bot API token. Prompts when omitted.")] = None,
     whitelist: Annotated[list[str] | None, typer.Option("--whitelist", help="Allowed private user id. Use '*' to allow all.")] = None,
     bind: Annotated[bool, typer.Option("--bind/--no-bind", help="Create or update a default binding for this channel.")] = True,
-    agent_id: Annotated[str, typer.Option("--agent", help="Agent id used by the default binding.")] = DEFAULT_AGENT_ID,
+    assistant_id: Annotated[str, typer.Option("--assistant", help="Assistant id used by the default binding.")] = DEFAULT_ASSISTANT_ID,
     chat_ids: Annotated[list[str] | None, typer.Option("--chat-id", help="Chat id matched by the default binding.")] = None,
     drop_pending_updates: Annotated[bool, typer.Option("--drop-pending-updates", help="Drop pending bot updates when polling starts.")] = False,
 ) -> None:
@@ -192,6 +192,6 @@ def telegram_bot(
     )
     update_or_save_channel_config(channel_id, channel=channel, config_file=cli_args.config_file)
     if bind:
-        upsert_binding_config(channel_id, agent_id=agent_id, chat_ids=chat_ids or ["*"], config_file=cli_args.config_file)
+        upsert_binding_config(channel_id, assistant_id=assistant_id, chat_ids=chat_ids or ["*"], config_file=cli_args.config_file)
 
     print(f"Onboarded telegram_bot channel `{channel_id}`")

@@ -21,6 +21,7 @@ dependencies = [
     # sdks
     "agent-client-protocol>=0.8.1",
     "mcp>=1.26.0",
+    "openai-codex>=0.131.0a4",
     # cli
     "typer==0.24.1",
     "rich==14.3.3",
@@ -35,7 +36,7 @@ dev = [
     "pyright>=1.1.408",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.2.0",
-    "ruff==0.15.7",
+    "ruff==0.15.8",
     "ty==0.0.24",
     "types-dateparser>=1.4.0.20260328",
     "types-qrcode>=8.2.0.20260508",
@@ -61,18 +62,24 @@ susie = { workspace = true }
 susie-core = { workspace = true }
 telegram-channel = { workspace = true }
 telegram-bot-channel = { workspace = true }
+openai-codex = { path = "vendor/codex/sdk/python", editable = true }
 
 [project.scripts]
 susie = "susie.cli:cli"
 
 [tool.ruff]
 line-length = 160
+extend-exclude = ["vendor/**"]
 
 [tool.ruff.format]
 docstring-code-format = true
 
 [tool.ruff.lint]
 extend-select = ["I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["vendor"]
 
 [tool.mypy]
 check_untyped_defs = true
@@ -81,3 +88,10 @@ packages = ["susie", "susie_core", "telegram_channel", "telegram_bot_channel"]
 [[tool.mypy.overrides]]
 module = ["telethon.*"]
 follow_untyped_imports = true
+
+[tool.pyright]
+include = ["src", "packages", "tests"]
+exclude = ["vendor/**"]
+
+[tool.ty.src]
+exclude = ["vendor/**"]

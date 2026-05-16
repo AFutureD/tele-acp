@@ -190,8 +190,7 @@ class TelegramChannel(Channel):
         for part in message.parts:
             match part:
                 case ChatMessageTextPart():
-                    mode = telethon.utils.sanitize_parse_mode("md")
-                    text, parts = mode.parse(part.text)
+                    text, parts = telegram_markdown.parse(part.text)
 
                     msg += text
                     entities.extend(parts)

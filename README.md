@@ -4,7 +4,7 @@
 > She is Audrey’s golden retriever, as well as her friend and trusted assistant.  
 > See https://lordofthemysteries.fandom.com/wiki/Susie for more details.
 
-**Chat with agents on Telegram through ACP.**
+**Chat with agents on Telegram through ACP and Codex app-server.**
 
 This project lets agents handle Telegram requests on my behalf through Telegram user-account channels or Bot API channels.
 
@@ -48,17 +48,24 @@ After starting the service, you can adjust the configuration to match your needs
 
 There are two parts.
 
-**Part one: ACP**
+**Part one: Agent runtime**
 
 > [!IMPORTANT]
-> At present, we only support Codex and Kimi.
+> `agent_id = "codex"` uses Codex app-server through the official `openai-codex` Python SDK. Other `agent_id` values are resolved through the ACP registry.
 
-You should manage your agent directly rather than through Susie.
+You should manage your agent runtime directly rather than through Susie.
 
-The working directory is `~/.config/susie/workspace/<YOUR_AGENT_ID>`.
+The working directory is `~/.config/susie/workspace/<YOUR_ASSISTANT_ID>`.
 
 > [!NOTE]
 > You can change the working directory in Susie's configuration.
+
+When developing from a git checkout, initialize the vendored Codex SDK:
+
+```bash
+git submodule update --init --recursive
+uv sync
+```
 
 
 **Part two: Susie**
@@ -75,9 +82,9 @@ See [Configuration](./docs/Configutation.md) for details.
 1. `Chat`: a conversation unit, such as a 1-to-1 chat or a Telegram group.
 2. `Channel`: the transport layer that sends and receives messages.
 3. `Replier`: the component that handles incoming messages and produces replies.
-4. `Agent`: an ACP-backed LLM agent used by an agent replier.
+4. `Agent`: a Codex app-server or ACP-backed LLM runtime used by an assistant replier.
 5. `Command Chain`: the command dispatcher for slash commands.
 
-A chat may have multiple repliers. An agent replier is backed by an agent.
+A chat may have multiple repliers. An assistant replier is backed by an agent runtime.
 
 The command chain can be used to control the chat, the repliers, or global state.

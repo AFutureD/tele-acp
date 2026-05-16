@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Annotated, Self
 
 import tomlkit
-from pydantic import BaseModel, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 from pydantic.fields import Field
-from susie_core import DEFAULT_AGENT_ID, AgentConfig, ChannelSettings, ConfigError
+from susie_core import DEFAULT_ASSISTANT_ID, AssistantConfig, ChannelSettings, ConfigError
 from telegram_bot_channel import TelegramBotChannelSettings
 from telegram_channel import DEFAULT_TELEGRAM_API_HASH, DEFAULT_TELEGRAM_API_ID, TelegramChannelSettings
 from tomlkit.exceptions import TOMLKitError
@@ -20,26 +20,33 @@ ChannelConfig = Annotated[TelegramChannelSettings | TelegramBotChannelSettings, 
 
 
 class ChatSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     channel: str = Field(description="The id of the `Channel`")
     chat_ids: list[str] = Field(default=[SUSIE_CHAT_ALL_INDICATOR], description="Optional chat IDs matched by this binding")
-    agent: str = Field(default=DEFAULT_AGENT_ID, description="The id of the `Agent`")
+    assistant_id: str = Field(default=DEFAULT_ASSISTANT_ID, description="The id of the `Assistant`")
 
 
 class Config(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     api_id: int | None = Field(default=None, description="Telegram api_id")
     api_hash: str | None = Field(default=None, description="Telegram api_hash")
 
     channels: dict[str, ChannelConfig] = Field(default_factory=dict)
-    agents: list[AgentConfig] = Field(default_factory=lambda: [AgentConfig(id=DEFAULT_AGENT_ID)])
+    assistants: list[AssistantConfig] = Field(default_factory=lambda: [AssistantConfig(assistant_id=DEFAULT_ASSISTANT_ID)])
     bindings: list[ChatSettings] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_bindings(self) -> Self:
-        agent_ids = map(lambda x: x.id, self.agents)
-        agent_id_set = set(agent_ids)
-        assert len(self.agents) >= 1, "At least one agent is required"
-        assert DEFAULT_AGENT_ID in agent_id_set, "Default agent must be present"
-        assert len(self.agents) == len(agent_id_set), "Agent ids must be unique"
+        assistant_ids = map(lambda x: x.assistant_id, self.assistants)
+        assistant_id_set = set(assistant_ids)
+        assert len(self.assistants) >= 1, "At least one assistant is required"
+        assert DEFAULT_ASSISTANT_ID in assistant_id_set, "Default assistant must be present"
+        assert len(self.assistants) == len(assistant_id_set), "Assistant ids must be unique"
+
+        for binding in self.bindings:
+            assert binding.assistant_id in assistant_id_set, f"Unknown assistant id: {binding.assistant_id}"
 
         return self
 
@@ -146,7 +153,9 @@ def update_or_save_channel_config(channel_id: str, channel: ChannelSettings, con
     _save_config_toml(data, config_file)
 
 
-def upsert_binding_config(channel_id: str, agent_id: str = DEFAULT_AGENT_ID, chat_ids: list[str] | None = None, config_file: Path | None = None) -> None:
+def upsert_binding_config(
+    channel_id: str, assistant_id: str = DEFAULT_ASSISTANT_ID, chat_ids: list[str] | None = None, config_file: Path | None = None
+) -> None:
     config_file, data = _load_config_toml(config_file)
     bindings = _ensure_aot(data, "bindings")
 
@@ -168,7 +177,7 @@ def upsert_binding_config(channel_id: str, agent_id: str = DEFAULT_AGENT_ID, cha
         bindings.append(target)
 
     target["channel"] = channel_id
-    target["agent"] = agent_id
+    target["assistant_id"] = assistant_id
     target["chat_ids"] = chat_ids
 
     Config.model_validate(data)
