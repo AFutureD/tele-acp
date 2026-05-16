@@ -1,5 +1,8 @@
 import asyncio
 import contextlib
+import errno
+import logging
+import socket
 
 import acp
 
@@ -11,6 +14,10 @@ from susie.config import Config
 from susie.constant import NAME, SUSIE_MCP_NAME
 from susie.replier import ChatReplierHub
 from susie.router import Router
+
+
+class MCPServerStartupError(RuntimeError):
+    """Raised when the built-in MCP HTTP server cannot start."""
 
 
 class APP:
@@ -57,6 +64,7 @@ class APP:
         self._acp_registery = acp_registry
 
         self._shutdown = asyncio.Event()
+        self.logger = logging.getLogger(__name__)
 
     async def startup(self) -> None:
         async with contextlib.AsyncExitStack() as stack:
@@ -64,7 +72,7 @@ class APP:
             await stack.enter_async_context(self._acp_hub.run())
 
             group = await stack.enter_async_context(asyncio.TaskGroup())
-            group.create_task(self._mcp_server.run_streamable_http_async())
+            group.create_task(self._mcp_server.start())
 
             await self._shutdown.wait()
 

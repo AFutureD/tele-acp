@@ -4,7 +4,7 @@
             "name": "Tele ACP Launch",
             "type": "debugpy",
             "request": "launch",
-            "module": "tele_acp.cli",
+            "module": "susie.cli",
             "args": [
                 "start"
             ]

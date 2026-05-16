@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
 from typing import Tuple, cast
 
@@ -14,6 +15,7 @@ class MCP(FastMCP):
     def __init__(self):
         super().__init__(name=SUSIE_MCP_NAME, json_response=True, port=SUSIE_MCP_PORT)
         self._chat_manager: ChatManager | None = None
+        self.logger = logging.getLogger("MCP")
 
     @property
     def mcp_url(self) -> str:
@@ -30,6 +32,13 @@ class MCP(FastMCP):
     async def get_chat(self, channel_id: str, chat_id: str) -> Chat | None:
         chat = self.chat_manager.get_chat(channel_id, chat_id)
         return chat
+
+    async def start(self) -> None:
+        try:
+            await self.run_streamable_http_async()
+        except SystemExit:
+            self.logger.error("MCP server failed to start", exc_info=True)
+            raise
 
 
 mcp_server = MCP()
