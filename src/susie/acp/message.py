@@ -32,6 +32,7 @@ def _description_content_chunk(chunk: acp.schema.ContentChunk) -> str:
         return "EmbeddedResourceContentBlock"
     return ""
 
+
 class AcpMessage(BaseModel):
     # TODO: make it list and as message can handle queued messages.
     prompt: list[AcpContentBlock] = []
@@ -64,9 +65,17 @@ class AcpMessage(BaseModel):
                     ret.append(ChatMessageBlockQuote(f"[{status}] {title}", content))
 
                 case acp.schema.ToolCallProgress():
+                    the_tool_start_chunk = next(
+                        (c for c in self.chunks if isinstance(c, acp.schema.ToolCallStart) and c.tool_call_id == chunk.tool_call_id), None
+                    )
+
                     status = chunk.status
                     title = chunk.title
                     content = str(chunk.content)
+
+                    if (chunk.title is None or chunk.title == "") and the_tool_start_chunk is not None:
+                        title = the_tool_start_chunk.title
+
                     ret.append(ChatMessageBlockQuote(f"[{status}] {title}", content))
 
                 case acp.schema.AgentPlanUpdate():

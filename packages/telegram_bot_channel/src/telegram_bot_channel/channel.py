@@ -61,6 +61,7 @@ class TelegramBotChannel:
         self._message_handler = message_handler
         self._application: Application = ApplicationBuilder().token(settings.token).build()
         self._application.add_handler(MessageHandler(filters.ALL, self._on_receive_update))
+        self._cached_me_id: int | None = None
         self._cached_me_username: str | None = None
         self._chat_infos: dict[str, ChatInfo] = {}
         self._messages: defaultdict[str, deque[ChatMessage]] = defaultdict(lambda: deque(maxlen=100))
@@ -78,6 +79,7 @@ class TelegramBotChannel:
             self.logger.exception("Failed to get Telegram bot status")
             return False
 
+        self._cached_me_id = me.id
         self._cached_me_username = me.username
         return True
 
@@ -86,6 +88,7 @@ class TelegramBotChannel:
         await self._application.initialize()
         try:
             me = await self._application.bot.get_me()
+            self._cached_me_id = me.id
             self._cached_me_username = me.username
 
             if self._application.updater is None:
@@ -118,11 +121,10 @@ class TelegramBotChannel:
                     text = f"<blockquote expandable>{part.title}\n{part.body}</blockquote>"
 
                     msg += text
+                    msg += "\n"
 
                 case ChatMessageFilePart():
                     pass
-
-            msg += "\n"
 
         if msg:
             await self._application.bot.send_message(
@@ -202,6 +204,9 @@ class TelegramBotChannel:
         return TELEGRAM_BOT_CHAT_ALL_INDICATOR in whitelist or user_id in whitelist
 
     def _is_mentioned(self, message: Message) -> bool:
+        if self._is_reply_to_me(message):
+            return True
+
         username = self._cached_me_username
         if username is None:
             return False
@@ -222,6 +227,13 @@ class TelegramBotChannel:
                     return True
 
         return False
+
+    def _is_reply_to_me(self, message: Message) -> bool:
+        bot_id = self._cached_me_id
+        if bot_id is None or message.reply_to_message is None or message.reply_to_message.from_user is None:
+            return False
+
+        return message.reply_to_message.from_user.id == bot_id
 
     async def list_chats(self, with_archived: bool = False) -> list[ChatInfo]:
         del with_archived
