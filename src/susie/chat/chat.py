@@ -6,7 +6,7 @@ from datetime import datetime
 from susie_core import Channel, Chatable, ChatAwareError, ChatMessage, ChatMessageQueryable, ChatMessageTextPart, ChatReplyable
 
 from susie.command import CommandChain
-from susie.config import ChatSettings
+from susie.settings import ChatSettings
 
 from .inspect import Inspector
 

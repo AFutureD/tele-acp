@@ -1,8 +1,22 @@
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Protocol
+from enum import Enum
+from typing import AsyncIterator, Protocol
 
-from susie_core import AgentModelOption
+from susie_core import AgentModelOption, ChatMessagePart
+
+
+class AgentTurnStatus(Enum):
+    in_progress = "in_progress"
+    cancelled = "cancelled"
+    completed = "completed"
+    failed = "failed"
+
+
+class AgentMessage(Protocol):
+    status: AgentTurnStatus
+
+    def chat_message_parts(self) -> list[ChatMessagePart]: ...
 
 
 class AgentRuntime(Protocol):
@@ -12,4 +26,4 @@ class AgentRuntime(Protocol):
     async def model(self) -> str | None: ...
     async def set_model(self, value: str) -> bool: ...
     async def cancel(self) -> None: ...
-    def prompt(self, parts: list[str]) -> AsyncIterator[Any]: ...
+    def prompt(self, parts: list[str]) -> AsyncIterator[AgentMessage]: ...

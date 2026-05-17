@@ -8,10 +8,10 @@ from susie.agent import ACPRegistryCache, ACPRuntimeHub
 from susie.channel import ChannelHub
 from susie.chat import ChatManager
 from susie.command import command_chain
-from susie.config import Config
 from susie.constant import NAME, SUSIE_MCP_NAME
 from susie.replier import ChatReplierHub
 from susie.router import Router
+from susie.settings import Config
 
 
 class MCPServerStartupError(RuntimeError):

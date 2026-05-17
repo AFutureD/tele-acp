@@ -7,8 +7,8 @@ from susie_core import Channel, ChatMessage
 from telegram_bot_channel import TelegramBotChannel, TelegramBotChannelSettings
 from telegram_channel import TelegramChannel, TelegramChannelSettings
 
-from susie.config import Config
 from susie.router import Router
+from susie.settings import Config
 
 
 class ChannelHub:

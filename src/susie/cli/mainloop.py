@@ -3,7 +3,7 @@ import logging
 import signal
 
 from susie.app import APP
-from susie.config import load_config
+from susie.settings import load_config
 
 from .shared import SharedArgs
 

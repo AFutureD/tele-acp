@@ -4,7 +4,7 @@ from susie_core import AssistantConfig, ChatReplyable
 
 from susie.agent import ACPRuntimeHub, AgentRuntime, CodexSDKRuntime, get_agent_work_dir
 from susie.command import CommandChain
-from susie.config import Config
+from susie.settings import Config
 
 from .assistant import AssistantReplier
 from .command import CommandReplier

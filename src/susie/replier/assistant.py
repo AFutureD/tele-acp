@@ -1,9 +1,9 @@
 import logging
 
 import jinja2
-from susie_core import AssistantConfig, Chatable, ChatCommandResponder, ChatMessage, ChatMessagePart, ChatMessageTextPart, Command
+from susie_core import AssistantConfig, Chatable, ChatCommandResponder, ChatMessage, ChatMessageTextPart, Command
 
-from susie.agent import AcpMessage, AgentRuntime, CodexSDKMessage
+from susie.agent import AgentRuntime, AgentTurnStatus
 from susie.assistants import get_agents_dir
 from susie.constant import SUSIE_MCP_NAME
 
@@ -22,11 +22,6 @@ PROMPT = (
     "User Content:\n"
     "{{content}}"
 )
-
-
-def convert_agent_message_to_chat_message(channel_id: str, chat_id: str, message: AcpMessage | CodexSDKMessage) -> ChatMessage:
-    parts: list[ChatMessagePart] = message.chat_message_parts()
-    return ChatMessage(id=None, channel_id=channel_id, chat_id=chat_id, receiver=None, reply_to=None, out=False, mute=False, parts=parts)
 
 
 class AssistantReplier(ChatCommandResponder):
@@ -82,6 +77,7 @@ class AssistantReplier(ChatCommandResponder):
         content = template.render(
             channel_id=channel_id,
             chat_id=chat_id,
+            message_id=message.id,
             reply_to=reply_to,
             content=text_part.text,
         )
@@ -94,14 +90,23 @@ class AssistantReplier(ChatCommandResponder):
 
         # start prompt request
         stream = self._acp_runtime.prompt(prompt)
-        async for delta in stream:
-            if (stop_reason := delta.stop_reason) and stop_reason != "cancelled":
-                msg = convert_agent_message_to_chat_message(message.channel_id, message.chat_id, delta)
+        async for agent_message in stream:
+            if agent_message.status in {AgentTurnStatus.completed, AgentTurnStatus.failed}:
+                msg = ChatMessage(
+                    id=None,
+                    channel_id=channel_id,
+                    chat_id=chat_id,
+                    receiver=None,
+                    reply_to=None,
+                    out=False,
+                    mute=False,
+                    parts=agent_message.chat_message_parts(),
+                )
                 if (forward_to := self.settings.forward_to) and forward_to != "":
                     msg.receiver = forward_to
                 await chat.send_message(msg)
 
-        self.logger.info("Message sent for peer: %s", message.channel_id)
+        self.logger.info("Message sent for peer: %s", channel_id)
 
     def list_commands(self) -> list[Command]:
         return [

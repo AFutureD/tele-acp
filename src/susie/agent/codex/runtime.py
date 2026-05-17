@@ -21,11 +21,12 @@ from openai_codex.generated.v2_all import (
     ThreadTokenUsageUpdatedNotification,
     TurnCompletedNotification,
     TurnError,
+    TurnStatus,
 )
 from susie_core import AgentModelOption, ChatMessagePart, ChatMessageTextPart
 from susie_core.chat import ChatMessageBlockQuote
 
-from susie.agent.runtime import AgentRuntime
+from susie.agent.runtime import AgentRuntime, AgentTurnStatus
 from susie.constant import VERSION
 
 
@@ -36,7 +37,7 @@ class CodexSDKMessage:
     chunks: list[ThreadItem] = field(default_factory=list)
     usage: ThreadTokenUsage | None = None
     error: TurnError | None = None
-    stop_reason: str | None = None
+    status: AgentTurnStatus = AgentTurnStatus.in_progress
 
     @property
     def text(self) -> str:
@@ -232,7 +233,15 @@ class CodexSDKRuntime(AgentRuntime):
                     continue
 
                 if isinstance(payload, TurnCompletedNotification) and payload.turn.id == turn.id:
-                    message.stop_reason = payload.turn.status.value
+                    match payload.turn.status:
+                        case TurnStatus.completed:
+                            message.status = AgentTurnStatus.completed
+                        case TurnStatus.interrupted:
+                            message.status = AgentTurnStatus.cancelled
+                        case TurnStatus.failed:
+                            message.status = AgentTurnStatus.failed
+                        case TurnStatus.in_progress:
+                            message.status = AgentTurnStatus.in_progress
                     message.error = payload.turn.error
                     yield message
                     break

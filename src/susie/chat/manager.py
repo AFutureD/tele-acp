@@ -4,8 +4,8 @@ from susie_core import DEFAULT_ASSISTANT_ID, Chatable, ChatInfo, ChatMessage, Co
 
 from susie.channel.hub import ChannelHub
 from susie.command import CommandChain
-from susie.config import SUSIE_CHAT_ALL_INDICATOR, ChatSettings, Config
 from susie.replier import ChatReplierHub
+from susie.settings import SUSIE_CHAT_ALL_INDICATOR, ChatSettings, Config
 
 from .chat import Chat
 

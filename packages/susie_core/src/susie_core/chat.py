@@ -16,10 +16,12 @@ class ChatMessageFilePart:
 class ChatMessageTextPart:
     text: str = Field(description="The text of the message")
 
+
 @dataclass
 class ChatMessageBlockQuote:
     title: str = Field(description="The text of the message")
     body: str = Field(description="The text of the message")
+
 
 type ChatMessagePart = ChatMessageFilePart | ChatMessageTextPart | ChatMessageBlockQuote
 

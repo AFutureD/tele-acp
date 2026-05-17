@@ -9,8 +9,8 @@ import acp
 from acp.schema import SessionConfigOption, SessionConfigSelectOption
 from susie_core import AgentModelOption, AssistantConfig, ChatAwareError
 
-from susie.agent.runtime import AgentRuntime
-from susie.config import Config
+from susie.agent.runtime import AgentRuntime, AgentTurnStatus
+from susie.settings import Config
 from susie.shared import get_app_user_config_dir
 
 from .client import ACPAgentConfig, ACPUpdateChunk
@@ -166,7 +166,12 @@ class ACPAgentRuntime(ACPAgentConnection, AgentRuntime):
                 yield message
 
             response = await task  # unlikely raise error
-            message.stop_reason = response.stop_reason
+            if response.stop_reason == "end_turn":
+                message.status = AgentTurnStatus.completed
+            elif response.stop_reason == "cancelled":
+                message.status = AgentTurnStatus.cancelled
+            else:
+                message.status = AgentTurnStatus.failed
             yield message
 
             self.logger.info("End Prompt")

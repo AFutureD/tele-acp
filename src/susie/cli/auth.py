@@ -6,7 +6,7 @@ import typer
 from rich import print
 from telegram_channel import TGClient, TGSession, format_me
 
-from susie.config import delete_channel_config_by_session_name, load_config
+from susie.settings import delete_channel_config_by_session_name, load_config
 
 from .onboard import onboard_telegram_user_channel
 from .shared import SharedArgs

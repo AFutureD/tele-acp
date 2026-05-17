@@ -12,7 +12,7 @@ from susie_core import DEFAULT_ASSISTANT_ID
 from telegram_bot_channel import TelegramBotChannelSettings
 from telegram_channel import TelegramChannelSettings, TGClient, TGSession, format_me, session_switch
 
-from susie.config import load_config, update_or_save_channel_config, upsert_binding_config
+from susie.settings import load_config, update_or_save_channel_config, upsert_binding_config
 
 from .shared import SharedArgs
 

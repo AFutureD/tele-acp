@@ -1,10 +1,12 @@
 from typing import Literal, TypeAlias
 
 import acp
-from acp.schema import AudioContentBlock, EmbeddedResourceContentBlock, ImageContentBlock, ResourceContentBlock, StopReason, TextContentBlock
+from acp.schema import AudioContentBlock, EmbeddedResourceContentBlock, ImageContentBlock, ResourceContentBlock, TextContentBlock
 from pydantic import BaseModel
 from susie_core import ChatMessagePart, ChatMessageTextPart
 from susie_core.chat import ChatMessageBlockQuote
+
+from susie.agent.runtime import AgentTurnStatus
 
 AcpAgentMessageChunk: TypeAlias = (
     acp.schema.AgentMessageChunk | acp.schema.AgentThoughtChunk | acp.schema.ToolCallStart | acp.schema.ToolCallProgress | acp.schema.AgentPlanUpdate
@@ -44,7 +46,7 @@ class AcpMessage(BaseModel):
     chunks: list[AcpAgentMessageChunk] = []
 
     usage: acp.schema.UsageUpdate | None = None
-    stop_reason: StopReason | None = None
+    status: AgentTurnStatus = AgentTurnStatus.in_progress
 
     def chat_message_parts(self) -> list[ChatMessagePart]:
 
