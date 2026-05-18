@@ -1,22 +1,20 @@
 import asyncio
 import contextlib
 import logging
-import uuid
 from pathlib import Path
-from typing import AsyncIterator, Self
+from typing import AsyncIterator
 
 import acp
+from acp import NewSessionResponse
 from acp.schema import SessionConfigOption, SessionConfigSelectOption
-from susie_core import AgentModelOption, AssistantConfig, ChatAwareError
+from susie_core import AgentModelOption, ChatAwareError
 
 from susie.agent.runtime import AgentRuntime, AgentTurnStatus
-from susie.settings import Config
 from susie.shared import get_app_user_config_dir
 
 from .client import ACPAgentConfig, ACPUpdateChunk
 from .connection import ACPAgentConnection
 from .message import AcpContentBlock, AcpMessage
-from .registry import ACPRegisteryManage, ACPRegistryCache
 
 
 def _get_agent_work_folder():
@@ -53,72 +51,75 @@ class ACPAgentRuntime(ACPAgentConnection, AgentRuntime):
         self._mcp_servers = mcp_servers
 
         self.id = id
-        self._session_id: str | None = None
+        self._session: NewSessionResponse | None = None
         self.session_options: dict[str, SessionConfigOption] = {}
         self._should_load_system_instructions = True
-
-    # MARK: Session
-
-    @property
-    def session_id(self) -> str | None:
-        return self._session_id
-
-    async def require_session_id(self) -> str:
-        if session_id := self._session_id:
-            return self._session_id
-
-        session_id = await self._new_session()
-        return session_id
-
-    async def new_session(self) -> str:
-        session_id = await self._new_session()
-        return session_id
-
-    async def _new_session(self) -> str:
-        if self.is_active:
-            await self.cancel()
-
-        try:
-            new_session = await self.connection.new_session(cwd=self._cwd, mcp_servers=self._mcp_servers)
-            session_id = new_session.session_id
-
-            # TODO: [2026/03/24 <Huanan>] it will raise "Resource not found" from codex acp. do not know why.
-            # issue: https://github.com/zed-industries/codex-acp/issues/203
-            # _ = await self.connction.load_session(cwd=self._cwd, session_id=session_id)
-
-            self._session_id = session_id
-            self.set_session_options(new_session.config_options)
-            self._should_load_system_instructions = True
-            return session_id
-        except Exception as e:
-            self.logger.error(f"Failed to create session: {e}")
-            raise
-
-    # MARK: Prompt
 
     @property
     def is_active(self) -> bool:
         return self._update_queue is not None
 
-    async def load_system_instruction_if_needed(self, instruction: str):
-        if not self._should_load_system_instructions:
-            return
-        self._should_load_system_instructions = False
+    # MARK: Session
 
-        session_id = await self.require_session_id()
+    @property
+    def session_id(self) -> str | None:
+        if session := self._session:
+            return session.session_id
+        return None
+
+    async def _new_session_if_needed(self, instruction: str | None) -> NewSessionResponse:
+        if session := self._session:
+            return session
+
+        session = await self._new_session(instruction)
+        return session
+
+    async def _new_session(self, instruction: str | None) -> NewSessionResponse:
+        if self.is_active:
+            await self.cancel()
+
+        try:
+            new_session = await self.connection.new_session(cwd=self._cwd, mcp_servers=self._mcp_servers)
+
+            # TODO: [2026/03/24 <Huanan>] it will raise "Resource not found" from codex acp. do not know why.
+            # issue: https://github.com/zed-industries/codex-acp/issues/203
+            # _ = await self.connction.load_session(cwd=self._cwd, session_id=session_id)
+
+            self._session_id = new_session.session_id
+            self.set_session_options(new_session.config_options)
+
+            if instruction:
+                prompt: list[AcpContentBlock] = [acp.text_block(instruction)]
+                await self.connection.prompt(prompt=prompt, session_id=new_session.session_id)
+
+            return new_session
+        except Exception as e:
+            self.logger.error(f"Failed to create session: {e}")
+            raise
+
+    async def new_session(self, instruction: str | None) -> str:
+        session = await self._new_session_if_needed(instruction)
+        return session.session_id
+
+    # MARK: Prompt
+
+    async def load_system_instruction_if_needed(self, instruction: str):
+        session = await self._new_session_if_needed(instruction)
 
         prompt: list[AcpContentBlock] = [acp.text_block(instruction)]
 
         try:
-            await self.connection.prompt(prompt=prompt, session_id=session_id)
+            await self.connection.prompt(prompt=prompt, session_id=session.session_id)
         except acp.RequestError as e:
             self.logger.error(f"Failed to prompt: {e.to_error_obj()}")
             raise ChatAwareError(f"Failed to prompt: {e.to_error_obj()}")
 
-        await self.connection.cancel(session_id)
+        await self.connection.cancel(session.session_id)
 
     async def prompt(self, parts: list[str]) -> AsyncIterator[AcpMessage]:
-        session_id = await self.require_session_id()
+        session = self._session
+        if session is None:
+            raise ChatAwareError("Please create session first")
 
         prompt: list[AcpContentBlock] = list(map(lambda m: acp.text_block(m), parts))
 
@@ -129,7 +130,7 @@ class ACPAgentRuntime(ACPAgentConnection, AgentRuntime):
 
         async def turn_task() -> acp.PromptResponse:
             try:
-                ret = await self.connection.prompt(prompt=prompt, session_id=session_id)
+                ret = await self.connection.prompt(prompt=prompt, session_id=session.session_id)
                 return ret
             except acp.RequestError as e:
                 self.logger.error(f"Failed to prompt: {e.to_error_obj()}")
@@ -259,46 +260,3 @@ class ACPAgentRuntime(ACPAgentConnection, AgentRuntime):
         ret = await self.connection.set_config_option(MODEL_CONFIG_ID, session_id, select.value)
         self.set_session_options(ret.config_options)
         return True
-
-
-class ACPRuntimeHub:
-    def __init__(
-        self,
-        config: Config,
-        acp_registry: ACPRegistryCache,
-        mcp_servers: list[acp.schema.HttpMcpServer | acp.schema.SseMcpServer | acp.schema.McpServerStdio] | None = None,
-    ) -> None:
-        self._config = config
-        self._stack: contextlib.AsyncExitStack | None = None
-        self._mcp_servers = mcp_servers
-        self._runtimes: dict[str, ACPAgentRuntime] = {}
-        self._acp_manager = ACPRegisteryManage(acp_registry)
-
-    async def spawn_acp_runtime(self, assistant: AssistantConfig) -> ACPAgentRuntime:
-        assert self._stack is not None
-
-        acp_config = await self.get_acp_config(assistant.agent_id)
-        assert acp_config is not None, "acp agent not found"
-
-        id = str(uuid.uuid4())
-        runtime = ACPAgentRuntime(id, acp_config, cwd=assistant.work_dir or get_agent_work_dir(assistant.assistant_id), mcp_servers=self._mcp_servers)
-        await self._stack.enter_async_context(runtime)
-        self._runtimes[id] = runtime
-
-        return runtime
-
-    async def get_acp_config(self, agent_id: str) -> ACPAgentConfig | None:
-        acp = await self._acp_manager.get_agent_config(agent_id)
-        return acp
-
-    def get_runtime(self, id: str) -> ACPAgentRuntime | None:
-        return self._runtimes.get(id)
-
-    @contextlib.asynccontextmanager
-    async def run(self) -> AsyncIterator[Self]:
-        async with contextlib.AsyncExitStack() as stack:
-            self._stack = stack
-            try:
-                yield self
-            finally:
-                self._stack = None

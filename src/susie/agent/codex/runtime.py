@@ -23,11 +23,22 @@ from openai_codex.generated.v2_all import (
     TurnError,
     TurnStatus,
 )
-from susie_core import AgentModelOption, ChatMessagePart, ChatMessageTextPart
+from susie_core import AgentModelOption, ChatAwareError, ChatMessagePart, ChatMessageTextPart
 from susie_core.chat import ChatMessageBlockQuote
 
-from susie.agent.runtime import AgentRuntime, AgentTurnStatus
+from susie.agent.runtime import AgentRuntime, AgentTurnStatus, McpServerHttpSetting
 from susie.constant import VERSION
+
+
+def _convert_mcp_settings_codex_config(mcp_servers: list[McpServerHttpSetting] | None = None) -> tuple[str, ...]:
+    if mcp_servers is None:
+        return ()
+
+    cfgs: list[str] = []
+    for mcp in mcp_servers:
+        cfgs.append(f"mcp_servers.{mcp.name}.enable=true")
+        cfgs.append(f"mcp_servers.{mcp.name}.url={mcp.url}")
+    return tuple(cfgs)
 
 
 @dataclass(slots=True)
@@ -102,13 +113,19 @@ class CodexSDKRuntime(AgentRuntime):
         self,
         *,
         cwd: str | Path,
+        mcp_servers: list[McpServerHttpSetting] | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         self.cwd = str(Path(cwd).resolve())
         self.logger = logger or logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
+        config: tuple[str, ...] = ()
+        mcp_servers_cfg = _convert_mcp_settings_codex_config(mcp_servers)
+        config += mcp_servers_cfg
+
         self._codex = AsyncCodex(
             AppServerConfig(
+                config_overrides=config,
                 cwd=self.cwd,
                 client_name="tele-acp",
                 client_title="tele-acp",
@@ -136,18 +153,19 @@ class CodexSDKRuntime(AgentRuntime):
     def is_active(self) -> bool:
         return self._active_turn is not None
 
-    async def _new_session_if_needed(self) -> AsyncThread:
+    async def _new_session_if_needed(self, instruction: str | None) -> AsyncThread:
         if thread := self._thread:
             return thread
 
-        thread = await self._new_session()
+        thread = await self._new_session(instruction)
         return thread
 
-    async def _new_session(self) -> AsyncThread:
+    async def _new_session(self, instruction: str | None) -> AsyncThread:
         if self.is_active:
             await self.cancel()
 
         thread = await self._codex.thread_start(
+            base_instructions=instruction,
             cwd=self.cwd,
             model=self._model,
             approval_mode=ApprovalMode.auto_review,
@@ -158,26 +176,9 @@ class CodexSDKRuntime(AgentRuntime):
         self._active_turn = None
         return thread
 
-    async def new_session(self) -> str:
-        thread = await self._new_session_if_needed()
+    async def new_session(self, instruction: str | None) -> str:
+        thread = await self._new_session_if_needed(instruction)
         return thread.id
-
-    async def load_system_instruction_if_needed(self, instruction: str) -> None:
-        thread = await self._new_session_if_needed()
-
-        _ = await thread.turn(
-            TextInput(instruction),
-            approval_mode=ApprovalMode.auto_review,
-            cwd=self.cwd,
-            model=self._model,
-        )
-        # await turn.steer(TextInput(""))
-        # self._active_turn = turn
-
-        # try:
-        #     await turn.run()
-        # finally:
-        #     self._active_turn = None
 
     async def model(self) -> str | None:
         if self._model is not None:
@@ -203,7 +204,9 @@ class CodexSDKRuntime(AgentRuntime):
         return True
 
     async def prompt(self, parts: list[str]) -> AsyncIterator[CodexSDKMessage]:
-        thread = await self._new_session_if_needed()
+        thread = self._thread
+        if thread is None:
+            raise ChatAwareError("Please create session first")
 
         message = CodexSDKMessage(prompt=parts)
         input_text = "\n\n".join(parts)

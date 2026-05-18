@@ -31,9 +31,6 @@ class AssistantReplier(ChatCommandResponder):
         self.logger = logging.getLogger(__name__)
 
     async def new_session(self) -> str:
-        session_id = await self._acp_runtime.new_session()
-        self.logger.info(f"new session: {session_id}")
-
         lib_agent_path = get_agents_dir()
         env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(lib_agent_path),
@@ -41,8 +38,10 @@ class AssistantReplier(ChatCommandResponder):
         )
         template = env.get_template("SYSTEM.md")
 
-        prompt = template.render(SUSIE_MCP_NAME=SUSIE_MCP_NAME)
-        await self._acp_runtime.load_system_instruction_if_needed(prompt)
+        instruction = template.render(SUSIE_MCP_NAME=SUSIE_MCP_NAME)
+
+        session_id = await self._acp_runtime.new_session(instruction)
+        self.logger.info(f"new session: {session_id}")
 
         return "ok"
 

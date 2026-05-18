@@ -2,9 +2,7 @@ import asyncio
 import contextlib
 import logging
 
-import acp
-
-from susie.agent import ACPRegistryCache, ACPRuntimeHub
+from susie.agent import ACPRegistryCache, AgentRuntimeHub, McpServerHttpSetting
 from susie.channel import ChannelHub
 from susie.chat import ChatManager
 from susie.command import command_chain
@@ -22,18 +20,14 @@ class APP:
     def __init__(self, config: Config):
         from susie.mcp import MCP, mcp_server
 
-        builtin_mcp = acp.schema.HttpMcpServer(
-            name=SUSIE_MCP_NAME,  # https://github.com/zed-industries/codex-acp/issues/55
-            url=mcp_server.mcp_url,
-            headers=[],
-            type="http",
-        )
+        # https://github.com/zed-industries/codex-acp/issues/55
+        builtin_mcp = McpServerHttpSetting(headers={}, name=SUSIE_MCP_NAME, url=mcp_server.mcp_url)
 
         # Layer One: IO
         _ = mcp_server
         _ = command_chain
         acp_registry = ACPRegistryCache()
-        acp_hub = ACPRuntimeHub(config, acp_registry, mcp_servers=[builtin_mcp])
+        acp_hub = AgentRuntimeHub(config, acp_registry, mcp_servers=[builtin_mcp])
 
         # Layer Two: The Data Process
         replier_hub = ChatReplierHub(config, acp_hub)
@@ -67,7 +61,6 @@ class APP:
     async def startup(self) -> None:
         async with contextlib.AsyncExitStack() as stack:
             await stack.enter_async_context(self._acp_hub.run())
-            await stack.enter_async_context(self._replier_hub)
             await stack.enter_async_context(self._channel_hub.run())
 
             group = await stack.enter_async_context(asyncio.TaskGroup())

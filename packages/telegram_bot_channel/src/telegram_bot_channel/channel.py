@@ -168,7 +168,11 @@ class TelegramBotChannel:
             lifespan=self.build_message_lifespan(chat_id=message.chat_id),
         )
         self._messages[chat_id].append(chat_message)
-        await self.receive_message(chat_message)
+        self._application.create_task(
+            self.receive_message(chat_message),
+            update=update,
+            name=f"{self.__class__.__name__}:{self.id}:receive:{chat_id}:{chat_message.id}",
+        )
 
     @contextlib.asynccontextmanager
     async def build_message_lifespan(self, chat_id: int) -> AsyncIterator[None]:
