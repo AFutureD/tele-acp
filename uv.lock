@@ -626,7 +626,7 @@ wheels = [
 [[package]]
 name = "openai-codex"
 version = "0.131.0a4"
-source = { editable = "vendor/codex/sdk/python" }
+source = { directory = "vendor/codex/sdk/python" }
 dependencies = [
     { name = "openai-codex-cli-bin" },
     { name = "pydantic" },
@@ -1222,7 +1222,7 @@ requires-dist = [
     { name = "dateparser", specifier = ">=1.3.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "mcp", specifier = ">=1.26.0" },
-    { name = "openai-codex", editable = "vendor/codex/sdk/python" },
+    { name = "openai-codex", directory = "vendor/codex/sdk/python" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "qrcode", specifier = ">=8.2" },
     { name = "rich", specifier = "==14.3.3" },

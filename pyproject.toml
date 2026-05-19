@@ -62,7 +62,7 @@ susie = { workspace = true }
 susie-core = { workspace = true }
 telegram-channel = { workspace = true }
 telegram-bot-channel = { workspace = true }
-openai-codex = { path = "vendor/codex/sdk/python", editable = true }
+openai-codex = { path = "vendor/codex/sdk/python" }
 
 [project.scripts]
 susie = "susie.cli:cli"
