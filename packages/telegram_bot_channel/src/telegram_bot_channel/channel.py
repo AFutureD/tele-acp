@@ -7,8 +7,8 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
 from typing import Self
 
-from susie_core import ChatInfo, ChatMessage, ChatMessageBlockQuote, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart
-from telegram import Message, MessageEntity, Update
+from susie_core import Channel, ChatInfo, ChatMessage, ChatMessageBlockQuote, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart
+from telegram import Message, MessageEntity, Update, User
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, MessageHandler, filters
 
@@ -49,7 +49,7 @@ def convert_telegram_bot_message_to_chat_message(
     )
 
 
-class TelegramBotChannel:
+class TelegramBotChannel(Channel):
     def __init__(
         self,
         id: str,
@@ -67,6 +67,38 @@ class TelegramBotChannel:
         self._messages: defaultdict[str, deque[ChatMessage]] = defaultdict(lambda: deque(maxlen=100))
         self.logger = logging.getLogger(f"{self.__class__.__name__}:{self.id}")
 
+        self._cached_me: User | None = None
+
+    async def __aenter__(self) -> "TelegramBotChannel":
+        await self._application.initialize()
+
+        me = await self._application.bot.get_me()
+        self._cached_me_id = me.id
+        self._cached_me_username = me.username
+
+        if self._application.updater is None:
+            raise RuntimeError("Telegram bot updater is not available")
+
+        await self._application.updater.start_polling(drop_pending_updates=self.settings.drop_pending_updates)
+        await self._application.start()
+
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        if self._application.updater is not None and self._application.updater.running:
+            await self._application.updater.stop()
+        if self._application.running:
+            await self._application.stop()
+        await self._application.shutdown()
+
+    @contextlib.asynccontextmanager
+    async def run_until_finish(self) -> AsyncIterator[Self]:
+        await self.__aenter__()
+        try:
+            yield self
+        finally:
+            await self.__aexit__(None, None, None)
+
     @property
     def id(self) -> str:
         return self._id
@@ -74,36 +106,21 @@ class TelegramBotChannel:
     @property
     async def status(self) -> bool:
         try:
-            me = await self._application.bot.get_me()
+            _ = await self.get_me()
         except Exception:
             self.logger.exception("Failed to get Telegram bot status")
             return False
 
-        self._cached_me_id = me.id
-        self._cached_me_username = me.username
         return True
 
-    @contextlib.asynccontextmanager
-    async def run_until_finish(self) -> AsyncIterator[Self]:
-        await self._application.initialize()
+    async def get_me(self) -> User:
         try:
+            # if self._application.running else self._application.bot.bot
             me = await self._application.bot.get_me()
-            self._cached_me_id = me.id
-            self._cached_me_username = me.username
-
-            if self._application.updater is None:
-                raise RuntimeError("Telegram bot updater is not available")
-
-            await self._application.updater.start_polling(drop_pending_updates=self.settings.drop_pending_updates)
-            await self._application.start()
-
-            yield self
+            return me
         finally:
-            if self._application.updater is not None and self._application.updater.running:
-                await self._application.updater.stop()
-            if self._application.running:
-                await self._application.stop()
-            await self._application.shutdown()
+            if not self._application.running:
+                await self._application.shutdown()
 
     async def send_message(self, message: ChatMessage) -> None:
         files = [part.path for part in message.parts if isinstance(part, ChatMessageFilePart)]

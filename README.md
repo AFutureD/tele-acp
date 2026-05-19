@@ -33,7 +33,8 @@ susie auth me
 For a Telegram bot:
 
 ```bash
-susie onboard telegram_bot my_bot --token '<bot-token>'
+susie onboard telegram_bot '<bot-token>'
+susie onboard telegram_bot '<bot-token>' --id my_bot  # optional explicit channel id
 ```
 
 ### 3. Start the service

@@ -34,12 +34,12 @@ class Config(BaseModel):
     api_hash: str | None = Field(default=None, description="Telegram api_hash")
 
     channels: dict[str, ChannelConfig] = Field(default_factory=dict)
-    assistants: list[AssistantConfig] = Field(default_factory=lambda: [AssistantConfig(assistant_id=DEFAULT_ASSISTANT_ID)])
+    assistants: list[AssistantConfig] = Field(default_factory=lambda: [AssistantConfig(id=DEFAULT_ASSISTANT_ID)])
     bindings: list[ChatSettings] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_bindings(self) -> Self:
-        assistant_ids = map(lambda x: x.assistant_id, self.assistants)
+        assistant_ids = map(lambda x: x.id, self.assistants)
         assistant_id_set = set(assistant_ids)
         assert len(self.assistants) >= 1, "At least one assistant is required"
         assert DEFAULT_ASSISTANT_ID in assistant_id_set, "Default assistant must be present"

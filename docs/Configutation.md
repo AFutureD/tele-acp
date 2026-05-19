@@ -5,7 +5,7 @@
 Susie's all settings are stored under `~/.config/susie/`.
 
 - configuration: `~/.config/susie/config.toml`
-- assistant workspace: `~/.config/susie/workspace/<assistant_id>/`
+- assistant workspace: `~/.config/susie/workspace/<assistant-id>/`
 
 ## 2. Default Configuration
 
@@ -52,7 +52,7 @@ only_mention = true
 
 [[assistants]]
 # The ID of the assistant.
-assistant_id = "default"
+id = "default"
 
 # The agent runtime ID used by this assistant.
 # "codex" uses Codex app-server through the official openai-codex SDK.
@@ -76,7 +76,7 @@ Example:
 
 ```toml
 [[assistants]]
-assistant_id = "default"
+id = "default"
 agent_id = "codex"
 work_dir = "/absolute/path/to/your/project"
 ```
@@ -84,7 +84,7 @@ work_dir = "/absolute/path/to/your/project"
 If `work_dir` is not set, Susie will automatically use the default directory for that assistant:
 
 ```text
-~/.config/susie/workspace/<assistant_id>/
+~/.config/susie/workspace/<assistant-id>/
 ```
 
 ### 3.2 How do I configure a channel?
@@ -127,7 +127,8 @@ only_mention = true
 You can write this with:
 
 ```bash
-susie onboard telegram_bot my_bot --token '<bot-token>'
+susie onboard telegram_bot '<bot-token>'
+susie onboard telegram_bot '<bot-token>' --id my_bot
 ```
 
 > [!NOTE]
@@ -153,7 +154,7 @@ If you define multiple assistants, you can assign them by channel:
 
 ```toml
 [[assistants]]
-assistant_id = "ops"
+id = "ops"
 agent_id = "codex"
 work_dir = "/absolute/path/to/ops-workspace"
 
@@ -179,7 +180,7 @@ Notes:
 
 - `channel` must match the key used in `[channels.<id>]`, not `session_name`.
 - `chat_ids` is optional. When present, the binding only matches those chats. A single `chat_id` value is also accepted and normalized to `chat_ids = ["..."]`.
-- `assistant_id` must reference an assistant ID already defined in `[[assistants]]`.
+- `assistant_id` must reference an assistant `id` already defined in `[[assistants]]`.
 - Bindings first try to match `channel + chat_ids`, then fall back to the first binding that matches only `channel`.
 - If no binding matches, Susie falls back to the `default` assistant for that channel.
 
@@ -189,7 +190,7 @@ Set `agent_id` in the corresponding `[[assistants]]` entry:
 
 ```toml
 [[assistants]]
-assistant_id = "default"
+id = "default"
 agent_id = "codex"
 ```
 

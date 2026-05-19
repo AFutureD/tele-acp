@@ -4,6 +4,7 @@ from typing import Annotated
 
 import typer
 from rich import print
+from susie_core import DEFAULT_ASSISTANT_ID
 from telegram_channel import TGClient, TGSession, format_me
 
 from susie.settings import delete_channel_config_by_session_name, load_config
@@ -76,7 +77,7 @@ def auth_login(
             use_qrcode=use_qrcode,
             switch_as_current=switch_as_current,
             bind=False,
-            assistant_id="default",
+            assistant_id=DEFAULT_ASSISTANT_ID,
             chat_ids=["*"],
         )
     )

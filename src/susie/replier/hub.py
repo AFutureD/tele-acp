@@ -13,7 +13,7 @@ class ChatReplierHub:
         self._config = config
         self._acp_hub = acp_hub
 
-        self.settings: dict[str, AssistantConfig] = {assistant.assistant_id: assistant for assistant in config.assistants}
+        self.settings: dict[str, AssistantConfig] = {assistant.id: assistant for assistant in config.assistants}
 
     async def build_replier(self, replier_id: str, command_chain: CommandChain | None = None) -> ChatReplyable:
         assistant_id = replier_id

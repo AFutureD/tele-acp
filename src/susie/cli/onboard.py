@@ -9,7 +9,7 @@ import qrcode
 import typer
 from rich import print
 from susie_core import DEFAULT_ASSISTANT_ID
-from telegram_bot_channel import TelegramBotChannelSettings
+from telegram_bot_channel import TelegramBotChannel, TelegramBotChannelSettings
 from telegram_channel import TelegramChannelSettings, TGClient, TGSession, format_me, session_switch
 
 from susie.settings import load_config, update_or_save_channel_config, upsert_binding_config
@@ -174,8 +174,8 @@ def telegram_user(
 )
 def telegram_bot(
     ctx: typer.Context,
-    channel_id: Annotated[str, typer.Argument(help="Channel ID used in Susie's config and bindings.")],
-    token: Annotated[str | None, typer.Option("--token", help="Telegram Bot API token. Prompts when omitted.")] = None,
+    token: Annotated[str, typer.Option("--token", help="Telegram Bot API token.")],
+    channel_id: Annotated[str | None, typer.Option("--id", help="Use the provided channel ID instead of the bot username.")] = None,
     whitelist: Annotated[list[str] | None, typer.Option("--whitelist", help="Allowed private user id. Use '*' to allow all.")] = None,
     bind: Annotated[bool, typer.Option("--bind/--no-bind", help="Create or update a default binding for this channel.")] = True,
     assistant_id: Annotated[str, typer.Option("--assistant", help="Assistant id used by the default binding.")] = DEFAULT_ASSISTANT_ID,
@@ -183,15 +183,39 @@ def telegram_bot(
     drop_pending_updates: Annotated[bool, typer.Option("--drop-pending-updates", help="Drop pending bot updates when polling starts.")] = False,
 ) -> None:
     cli_args: SharedArgs = ctx.obj
-    resolved_token = token or typer.prompt("Please enter Telegram Bot API token", type=str, hide_input=True)
 
-    channel = TelegramBotChannelSettings(
-        token=resolved_token,
-        whitelist=whitelist or ["*"],
-        drop_pending_updates=drop_pending_updates,
-    )
-    update_or_save_channel_config(channel_id, channel=channel, config_file=cli_args.config_file)
-    if bind:
-        upsert_binding_config(channel_id, assistant_id=assistant_id, chat_ids=chat_ids or ["*"], config_file=cli_args.config_file)
+    async def _run() -> bool:
+        settings = TelegramBotChannelSettings(
+            token=token,
+            whitelist=whitelist or ["*"],
+            drop_pending_updates=drop_pending_updates,
+        )
+        channel = TelegramBotChannel(
+            id=channel_id or "telegram_bot",
+            settings=settings,
+            message_handler=lambda _: asyncio.sleep(0),
+        )
 
-    print(f"Onboarded telegram_bot channel `{channel_id}`")
+        try:
+            # Onboarding explicitly enters the short-lived identity lookup context for token validation.
+            async with channel as channel:
+                me = await channel.get_me()
+                resolved_channel_id = channel_id or me.username
+        except Exception as e:
+            print(f"Failed to verify Telegram Bot API token: {e}")
+            return False
+
+        if not resolved_channel_id:
+            print("Failed to resolve Telegram bot username. Please pass --id explicitly.")
+            return False
+
+        update_or_save_channel_config(resolved_channel_id, channel=channel.settings, config_file=cli_args.config_file)
+        if bind:
+            upsert_binding_config(resolved_channel_id, assistant_id=assistant_id, chat_ids=chat_ids or ["*"], config_file=cli_args.config_file)
+
+        print(f"Onboarded telegram_bot channel `{resolved_channel_id}`")
+        return True
+
+    ok = asyncio.run(_run())
+    if not ok:
+        raise typer.Exit(code=1)

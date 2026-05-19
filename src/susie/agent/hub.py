@@ -32,13 +32,13 @@ class AgentRuntimeHub:
 
         runtime: AgentRuntime
         if assistant.agent_id == "codex":
-            runtime = CodexSDKRuntime(cwd=assistant.work_dir or get_agent_work_dir(assistant.assistant_id), mcp_servers=self._mcp_servers)
+            runtime = CodexSDKRuntime(cwd=assistant.work_dir or get_agent_work_dir(assistant.id), mcp_servers=self._mcp_servers)
         else:
             acp_config = await self.get_acp_config(assistant.agent_id)
             assert acp_config is not None, f"acp agent {assistant.agent_id} not found"
-            
+
             runtime = ACPAgentRuntime(
-                id, acp_config, cwd=assistant.work_dir or get_agent_work_dir(assistant.assistant_id), mcp_servers=self.convert_to_acp_mcp_servers()
+                id, acp_config, cwd=assistant.work_dir or get_agent_work_dir(assistant.id), mcp_servers=self.convert_to_acp_mcp_servers()
             )
         await self._stack.enter_async_context(runtime)
         self._runtimes[id] = runtime
