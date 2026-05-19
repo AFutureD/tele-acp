@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
 from typing import Self
 
+import telegram.constants
 from susie_core import Channel, ChatInfo, ChatMessage, ChatMessageBlockQuote, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart
 from telegram import Message, MessageEntity, Update, User
 from telegram.constants import ChatAction, ParseMode
@@ -55,6 +56,73 @@ def _render_message_as_plain_text(message: ChatMessage) -> str:
     return msg
 
 
+def create_chat_id(type: str, chat_id: str | int, thread_id: int | None) -> str:
+    if thread_id is None:
+        match type:
+            case telegram.Chat.PRIVATE:
+                return f"P:{chat_id}"
+            case telegram.Chat.GROUP:
+                return f"G:{chat_id}"
+            case telegram.Chat.CHANNEL:
+                return f"C:{chat_id}"
+            case telegram.Chat.SUPERGROUP:
+                return f"S:{chat_id}"
+            case telegram.Chat.SENDER:
+                return f"X:{chat_id}"
+            case _:
+                return ""
+    else:
+        match type:
+            case telegram.Chat.PRIVATE:
+                return f"P:{chat_id}:{thread_id}"
+            case telegram.Chat.GROUP:
+                return f"G:{chat_id}:{thread_id}"
+            case telegram.Chat.CHANNEL:
+                return f"C:{chat_id}:{thread_id}"
+            case telegram.Chat.SUPERGROUP:
+                return f"S:{chat_id}:{thread_id}"
+            case telegram.Chat.SENDER:
+                return f"X:{chat_id}:{thread_id}"
+            case _:
+                return ""
+
+
+def split_from_chat_id(chat_id: str) -> tuple[str, int, int | None] | None:
+    parts = chat_id.split(sep=":")
+
+    if len(parts) == 3:
+        match parts[0].upper():
+            case "P":
+                return telegram.Chat.PRIVATE, int(parts[1]), int(parts[2])
+            case "G":
+                return telegram.Chat.GROUP, int(parts[1]), int(parts[2])
+            case "C":
+                return telegram.Chat.CHANNEL, int(parts[1]), int(parts[2])
+            case "S":
+                return telegram.Chat.SUPERGROUP, int(parts[1]), int(parts[2])
+            case "X":
+                return telegram.Chat.SENDER, int(parts[1]), int(parts[2])
+            case _:
+                return None
+
+    if len(parts) == 2:
+        match parts[0].upper():
+            case "P":
+                return telegram.Chat.PRIVATE, int(parts[1]), None
+            case "G":
+                return telegram.Chat.GROUP, int(parts[1]), None
+            case "C":
+                return telegram.Chat.CHANNEL, int(parts[1]), None
+            case "S":
+                return telegram.Chat.SUPERGROUP, int(parts[1]), None
+            case "X":
+                return telegram.Chat.SENDER, int(parts[1]), None
+            case _:
+                return None
+
+    return None
+
+
 def _message_text(message: Message) -> str | None:
     return message.text or message.caption
 
@@ -70,10 +138,12 @@ def convert_telegram_bot_message_to_chat_message(
     text = _message_text(message)
     parts: list[ChatMessagePart] = [ChatMessageTextPart(text)] if text else []
 
+    chat_id = create_chat_id(message.chat.type, message.chat.id, message.message_thread_id)
+
     return ChatMessage(
         id=str(message.message_id),
         channel_id=channel_id,
-        chat_id=str(message.chat_id),
+        chat_id=chat_id,
         receiver=None,
         reply_to=str(message.reply_to_message.message_id) if message.reply_to_message else None,
         out=bool(message.from_user and message.from_user.is_bot),
@@ -162,7 +232,18 @@ class TelegramBotChannel(Channel):
 
     async def send_message(self, message: ChatMessage) -> None:
         files = [part.path for part in message.parts if isinstance(part, ChatMessageFilePart)]
-        receiver = message.receiver or message.chat_id
+        parts = split_from_chat_id(chat_id=message.chat_id)
+        if parts is None:
+            return
+
+        _, raw_chat_id, raw_thread_id = parts
+
+        parts = split_from_chat_id(chat_id=message.receiver) if message.receiver else None
+        if parts:
+            _, raw_chat_id, raw_thread_id = parts
+
+        del parts
+
         reply_to_message_id = int(message.reply_to) if message.reply_to and message.reply_to.isdecimal() else None
 
         raw_msg = _render_message_as_plain_text(message)
@@ -172,18 +253,20 @@ class TelegramBotChannel(Channel):
 
         if msg:
             await self._application.bot.send_message(
-                chat_id=receiver,
+                chat_id=raw_chat_id,
                 text=msg,
                 parse_mode=ParseMode.HTML,
                 reply_to_message_id=reply_to_message_id,
+                message_thread_id=raw_thread_id,
             )
 
         for file_path in files:
             with open(file_path, "rb") as file:
                 await self._application.bot.send_document(
-                    chat_id=receiver,
+                    chat_id=raw_chat_id,
                     document=file,
                     reply_to_message_id=reply_to_message_id,
+                    message_thread_id=raw_thread_id,
                 )
 
         self.logger.info("send_message: %s", message)
@@ -203,13 +286,13 @@ class TelegramBotChannel(Channel):
         if not await self.is_message_allowed(message):
             return
 
-        chat_id = str(message.chat_id)
+        chat_id = create_chat_id(message.chat.type, message.chat.id, message.message_thread_id)
         self._chat_infos[chat_id] = ChatInfo(channel_id=self.id, chat_id=chat_id, name=_chat_title(message))
 
         chat_message = convert_telegram_bot_message_to_chat_message(
             self.id,
             message,
-            lifespan=self.build_message_lifespan(chat_id=message.chat_id),
+            lifespan=self.build_message_lifespan(raw_chat_id=message.chat_id, raw_thread_id=message.message_thread_id),
         )
         self._messages[chat_id].append(chat_message)
         self._application.create_task(
@@ -219,8 +302,8 @@ class TelegramBotChannel(Channel):
         )
 
     @contextlib.asynccontextmanager
-    async def build_message_lifespan(self, chat_id: int) -> AsyncIterator[None]:
-        await self._application.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    async def build_message_lifespan(self, raw_chat_id: int, raw_thread_id: int | None) -> AsyncIterator[None]:
+        await self._application.bot.send_chat_action(chat_id=raw_chat_id, action=ChatAction.TYPING, message_thread_id=raw_thread_id)
         yield
 
     async def is_message_allowed(self, message: Message) -> bool:
@@ -231,12 +314,12 @@ class TelegramBotChannel(Channel):
             return False
 
         user_id = str(message.from_user.id)
-        chat_id = str(message.chat_id)
+        raw_chat_id = str(message.chat.id)
 
         if message.chat.type == "private":
             return self._matches_whitelist(self.settings.whitelist, user_id)
 
-        policy = self._get_group_policy(chat_id)
+        policy = self._get_group_policy(raw_chat_id)
         if policy is None:
             return False
 

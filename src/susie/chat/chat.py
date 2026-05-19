@@ -43,6 +43,7 @@ class Chat(Chatable, ChatMessageQueryable):
             await self.channel.send_message(message)
         except Exception as e:
             self.logger.error(f"Error while sending message: {e}")
+            raise ChatAwareError(f"Error while sending message: {e}") from e
 
     async def list_messages(self, num: int = 1, date_start: datetime | None = None, date_end: datetime | None = None) -> list[ChatMessage]:
         return await self.channel.list_messages(chat_id=self.id, num=num, date_start=date_start, date_end=date_end)

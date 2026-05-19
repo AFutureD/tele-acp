@@ -34,6 +34,7 @@ class ChatMessage:
 
     channel_id: str = Field(description="Which channel this message was sent from")
     chat_id: str = Field(description="Which chat this message wants to be sent to")
+
     receiver: str | None = Field(description="Which user this message wants to be sent to")
     reply_to: str | None = Field(description="Which message this message is replying to. The value is the id of the message in the chat.")
 
