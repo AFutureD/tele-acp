@@ -23,6 +23,7 @@ from openai_codex.generated.v2_all import (
     TurnError,
     TurnStatus,
 )
+from openai_codex.models import NotificationPayload
 from susie_core import AgentModelOption, ChatAwareError, ChatMessagePart, ChatMessageTextPart
 from susie_core.chat import ChatMessageBlockQuote
 
@@ -218,36 +219,42 @@ class CodexSDKRuntime(AgentRuntime):
             model=self._model,
         )
         self._active_turn = turn
+        self.logger.info(f"thread {thread.id} started")
 
         try:
             yield message
             async for event in turn.stream():
-                payload = event.payload
+                payload: NotificationPayload = event.payload
 
-                if isinstance(payload, ItemCompletedNotification) and payload.turn_id == turn.id:
-                    message.delta = payload.item
-                    message.chunks.append(payload.item)
-                    yield message
-                    continue
+                self.logger.info(f"payload: {payload}")
 
-                if isinstance(payload, ThreadTokenUsageUpdatedNotification) and payload.turn_id == turn.id:
-                    message.usage = payload.token_usage
-                    yield message
-                    continue
+                match payload:
+                    case ItemCompletedNotification():
+                        message.delta = payload.item
+                        message.chunks.append(payload.item)
+                        yield message
 
-                if isinstance(payload, TurnCompletedNotification) and payload.turn.id == turn.id:
-                    match payload.turn.status:
-                        case TurnStatus.completed:
-                            message.status = AgentTurnStatus.completed
-                        case TurnStatus.interrupted:
-                            message.status = AgentTurnStatus.cancelled
-                        case TurnStatus.failed:
-                            message.status = AgentTurnStatus.failed
-                        case TurnStatus.in_progress:
-                            message.status = AgentTurnStatus.in_progress
-                    message.error = payload.turn.error
-                    yield message
-                    break
+                    case ThreadTokenUsageUpdatedNotification():
+                        message.usage = payload.token_usage
+                        # yield message
+
+                    case TurnCompletedNotification():
+                        match payload.turn.status:
+                            case TurnStatus.completed:
+                                message.status = AgentTurnStatus.completed
+                            case TurnStatus.interrupted:
+                                message.status = AgentTurnStatus.cancelled
+                            case TurnStatus.failed:
+                                message.status = AgentTurnStatus.failed
+                            case TurnStatus.in_progress:
+                                message.status = AgentTurnStatus.in_progress
+                        message.error = payload.turn.error
+                        # yield message
+                    case _:
+                        pass
+
+            yield message
+            self.logger.info(f"thread {thread.id} completed")
         finally:
             self._active_turn = None
 

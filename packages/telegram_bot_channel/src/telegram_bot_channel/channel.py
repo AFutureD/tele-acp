@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import html
 import logging
 from collections import defaultdict, deque
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -15,6 +16,43 @@ from telegram.ext import Application, ApplicationBuilder, ContextTypes, MessageH
 from .settings import TELEGRAM_BOT_CHAT_ALL_INDICATOR, TelegramBotChannelGroupPolicy, TelegramBotChannelSettings
 
 type MessageHandlerFn = Callable[[ChatMessage], Awaitable[None]]
+
+
+def _render_message_as_html(message: ChatMessage) -> str:
+    msg = ""
+    for part in message.parts:
+        match part:
+            case ChatMessageTextPart():
+                msg += html.escape(part.text)
+
+            case ChatMessageBlockQuote():
+                # https://core.telegram.org/bots/api#html-style
+                title = html.escape(part.title)
+                body = html.escape(part.body)
+                msg += f"<blockquote expandable>{title}\n{body}</blockquote>"
+                msg += "\n"
+
+            case ChatMessageFilePart():
+                pass
+
+    return msg
+
+
+def _render_message_as_plain_text(message: ChatMessage) -> str:
+    msg = ""
+    for part in message.parts:
+        match part:
+            case ChatMessageTextPart():
+                msg += part.text
+
+            case ChatMessageBlockQuote():
+                msg += f"{part.title}\n{part.body}"
+                msg += "\n"
+
+            case ChatMessageFilePart():
+                pass
+
+    return msg
 
 
 def _message_text(message: Message) -> str | None:
@@ -127,21 +165,10 @@ class TelegramBotChannel(Channel):
         receiver = message.receiver or message.chat_id
         reply_to_message_id = int(message.reply_to) if message.reply_to and message.reply_to.isdecimal() else None
 
-        msg = ""
-        for part in message.parts:
-            match part:
-                case ChatMessageTextPart():
-                    msg += part.text
+        raw_msg = _render_message_as_plain_text(message)
+        self.logger.debug("send_message raw text: %s", raw_msg)
 
-                case ChatMessageBlockQuote():
-                    # https://core.telegram.org/bots/api#html-style
-                    text = f"<blockquote expandable>{part.title}\n{part.body}</blockquote>"
-
-                    msg += text
-                    msg += "\n"
-
-                case ChatMessageFilePart():
-                    pass
+        msg = _render_message_as_html(message)
 
         if msg:
             await self._application.bot.send_message(
