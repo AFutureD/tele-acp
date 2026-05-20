@@ -8,12 +8,12 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
 from typing import Self
 
-import telegram.constants
 from susie_core import Channel, ChatInfo, ChatMessage, ChatMessageBlockQuote, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart
 from telegram import Message, MessageEntity, Update, User
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, MessageHandler, filters
 
+from .bot_action import _TelegramBotChatAction
 from .settings import TELEGRAM_BOT_CHAT_ALL_INDICATOR, TelegramBotChannelGroupPolicy, TelegramBotChannelSettings
 
 type MessageHandlerFn = Callable[[ChatMessage], Awaitable[None]]
@@ -303,8 +303,8 @@ class TelegramBotChannel(Channel):
 
     @contextlib.asynccontextmanager
     async def build_message_lifespan(self, raw_chat_id: int, raw_thread_id: int | None) -> AsyncIterator[None]:
-        await self._application.bot.send_chat_action(chat_id=raw_chat_id, action=ChatAction.TYPING, message_thread_id=raw_thread_id)
-        yield
+        async with _TelegramBotChatAction(self._application, raw_chat_id, ChatAction.TYPING, message_thread_id=raw_thread_id):
+            yield
 
     async def is_message_allowed(self, message: Message) -> bool:
         if message.from_user is None:
