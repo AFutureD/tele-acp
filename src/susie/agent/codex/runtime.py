@@ -209,8 +209,13 @@ class CodexSDKRuntime(AgentRuntime):
         if thread is None:
             raise ChatAwareError("Please create session first")
 
-        message = CodexSDKMessage(prompt=parts)
         input_text = "\n\n".join(parts)
+
+        if active_turn := self._active_turn:
+            await active_turn.steer(TextInput(input_text))
+            return
+
+        message = CodexSDKMessage(prompt=parts)
 
         turn = await thread.turn(
             TextInput(input_text),

@@ -6,11 +6,12 @@ import logging
 from collections import defaultdict, deque
 from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
+from pathlib import Path
 from typing import Self
 
 import telegram
 from susie_core import Channel, ChatInfo, ChatMessage, ChatMessageBlockQuote, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart
-from telegram import Message, MessageEntity, Update, User
+from telegram import Message, MessageEntity, PhotoSize, Update, User
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, MessageHandler, filters
 
@@ -18,6 +19,8 @@ from .bot_action import _TelegramBotChatAction
 from .settings import TELEGRAM_BOT_CHAT_ALL_INDICATOR, TelegramBotChannelGroupPolicy, TelegramBotChannelSettings
 
 type MessageHandlerFn = Callable[[ChatMessage], Awaitable[None]]
+
+_PHOTO_ATTACHMENT_DIR = Path("/tmp/susie/attachments/photos")
 
 
 def _render_message_as_html(message: ChatMessage) -> str:
@@ -134,10 +137,12 @@ def _chat_title(message: Message) -> str | None:
 
 
 def convert_telegram_bot_message_to_chat_message(
-    channel_id: str, message: Message, lifespan: contextlib.AbstractAsyncContextManager | None = None
+    channel_id: str, message: Message, attachments: list[ChatMessageFilePart] | None, lifespan: contextlib.AbstractAsyncContextManager | None = None
 ) -> ChatMessage:
     text = _message_text(message)
     parts: list[ChatMessagePart] = [ChatMessageTextPart(text)] if text else []
+
+    parts.extend(attachments or [])
 
     chat_id = create_chat_id(message.chat.type, message.chat.id, message.message_thread_id)
 
@@ -282,6 +287,18 @@ class TelegramBotChannel(Channel):
         if message is None:
             return
 
+        # topic 创建，忽视。
+        if message.forum_topic_created:
+            return
+
+        # topic 创建的第一条消息，忽视。
+        if (
+            (reply_to_message := message.reply_to_message)
+            and (forum_topic_created := reply_to_message.forum_topic_created)
+            and forum_topic_created.name == message.text
+        ):
+            return
+
         self.logger.info(message)
 
         if not await self.is_message_allowed(message):
@@ -290,11 +307,30 @@ class TelegramBotChannel(Channel):
         chat_id = create_chat_id(message.chat.type, message.chat.id, message.message_thread_id)
         self._chat_infos[chat_id] = ChatInfo(channel_id=self.id, chat_id=chat_id, name=_chat_title(message))
 
+        # download photo
+        photo_path: str | None = None
+        if photo := message.photo:
+            photos: list[PhotoSize] = list(photo)
+            if photos:
+                largest_photo = max(photos, key=lambda item: (item.width * item.height, item.file_size or 0))
+                target_path = _PHOTO_ATTACHMENT_DIR / largest_photo.file_unique_id
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+
+                if target_path.exists():
+                    photo_path = str(target_path)
+                else:
+                    telegram_file = await largest_photo.get_file()
+                    downloaded_path = await telegram_file.download_to_drive(custom_path=target_path)
+                    photo_path = str(downloaded_path)
+
+        # build message
         chat_message = convert_telegram_bot_message_to_chat_message(
             self.id,
             message,
+            attachments=[ChatMessageFilePart(path=photo_path)] if photo_path else None,
             lifespan=self.build_message_lifespan(raw_chat_id=message.chat_id, raw_thread_id=message.message_thread_id),
         )
+
         self._messages[chat_id].append(chat_message)
         self._application.create_task(
             self.receive_message(chat_message),
