@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -204,7 +204,7 @@ class CodexSDKRuntime(AgentRuntime):
         self._model = selected.model
         return True
 
-    async def prompt(self, parts: list[str]) -> AsyncIterator[CodexSDKMessage]:
+    async def prompt(self, parts: list[str]) -> AsyncGenerator[CodexSDKMessage, None]:
         thread = self._thread
         if thread is None:
             raise ChatAwareError("Please create session first")

@@ -1,3 +1,4 @@
+import contextlib
 import logging
 
 import jinja2
@@ -89,21 +90,23 @@ class AssistantReplier(ChatCommandResponder):
 
         # start prompt request
         stream = self._acp_runtime.prompt(prompt)
-        async for agent_message in stream:
-            if agent_message.status in {AgentTurnStatus.completed, AgentTurnStatus.failed}:
-                msg = ChatMessage(
-                    id=None,
-                    channel_id=channel_id,
-                    chat_id=chat_id,
-                    receiver=None,
-                    reply_to=None,
-                    out=False,
-                    mute=False,
-                    parts=agent_message.chat_message_parts(),
-                )
-                if (forward_to := self.settings.forward_to) and forward_to != "":
-                    msg.receiver = forward_to
-                await chat.send_message(msg)
+
+        async with contextlib.aclosing(stream):
+            async for agent_message in stream:
+                if agent_message.status in {AgentTurnStatus.completed, AgentTurnStatus.failed}:
+                    msg = ChatMessage(
+                        id=None,
+                        channel_id=channel_id,
+                        chat_id=chat_id,
+                        receiver=None,
+                        reply_to=None,
+                        out=False,
+                        mute=False,
+                        parts=agent_message.chat_message_parts(),
+                    )
+                    if (forward_to := self.settings.forward_to) and forward_to != "":
+                        msg.receiver = forward_to
+                    await chat.send_message(msg)
 
         self.logger.info("Message sent for peer: %s", channel_id)
 

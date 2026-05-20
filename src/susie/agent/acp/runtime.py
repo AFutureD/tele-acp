@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 import logging
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncGenerator
 
 import acp
 from acp import NewSessionResponse
@@ -116,7 +116,7 @@ class ACPAgentRuntime(ACPAgentConnection, AgentRuntime):
 
         await self.connection.cancel(session.session_id)
 
-    async def prompt(self, parts: list[str]) -> AsyncIterator[AcpMessage]:
+    async def prompt(self, parts: list[str]) -> AsyncGenerator[AcpMessage, None]:
         session = self._session
         if session is None:
             raise ChatAwareError("Please create session first")
