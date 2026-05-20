@@ -11,16 +11,25 @@ from pydantic.json_schema import SkipJsonSchema
 class ChatMessageFilePart:
     path: str = Field(description="The local path of the file")
 
+    def __str__(self):
+        return f"<file>{self.path}</file>"
+
 
 @dataclass
 class ChatMessageTextPart:
     text: str = Field(description="The text of the message")
+
+    def __str__(self):
+        return self.text
 
 
 @dataclass
 class ChatMessageBlockQuote:
     title: str = Field(description="The text of the message")
     body: str = Field(description="The text of the message")
+
+    def __str__(self):
+        return f"<block>{self.title}\n{self.body}</block>"
 
 
 type ChatMessagePart = ChatMessageFilePart | ChatMessageTextPart | ChatMessageBlockQuote

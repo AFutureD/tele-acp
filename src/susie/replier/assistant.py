@@ -2,7 +2,7 @@ import contextlib
 import logging
 
 import jinja2
-from susie_core import AssistantConfig, Chatable, ChatCommandResponder, ChatMessage, ChatMessageTextPart, Command
+from susie_core import AssistantConfig, Chatable, ChatCommandResponder, ChatMessage, Command
 
 from susie.agent import AgentRuntime, AgentTurnStatus
 from susie.assistants import get_agents_dir
@@ -69,8 +69,8 @@ class AssistantReplier(ChatCommandResponder):
         chat_id = message.chat_id
         reply_to = message.reply_to
 
-        text_part = next((x for x in message.parts if isinstance(x, ChatMessageTextPart)), None)
-        if text_part is None:
+        text_part = "\n".join([str(x) for x in message.parts])
+        if text_part is None or text_part == "":
             return
 
         template = jinja2.Template(PROMPT)
@@ -79,7 +79,7 @@ class AssistantReplier(ChatCommandResponder):
             chat_id=chat_id,
             message_id=message.id,
             reply_to=reply_to,
-            content=text_part.text,
+            content=text_part,
         )
         prompt = [content]
 

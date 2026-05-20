@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Self
 
+import av
 import telegram
 from susie_core import Channel, ChatInfo, ChatMessage, ChatMessageBlockQuote, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart
 from telegram import Message, MessageEntity, PhotoSize, Update, User
@@ -20,7 +21,9 @@ from .settings import TELEGRAM_BOT_CHAT_ALL_INDICATOR, TelegramBotChannelGroupPo
 
 type MessageHandlerFn = Callable[[ChatMessage], Awaitable[None]]
 
-_PHOTO_ATTACHMENT_DIR = Path("/tmp/susie/attachments/photos")
+_TMP_ATTACHMENT_DIR = Path("/tmp/susie/attachments")
+_PHOTO_ATTACHMENT_DIR = _TMP_ATTACHMENT_DIR / "photos"
+_VOICE_ATTACHMENT_DIR = _TMP_ATTACHMENT_DIR / "voices"
 
 
 def _render_message_as_html(message: ChatMessage) -> str:
@@ -134,6 +137,43 @@ def _message_text(message: Message) -> str | None:
 def _chat_title(message: Message) -> str | None:
     chat = message.chat
     return chat.title or chat.full_name or chat.username
+
+
+def _convert_ogg_to_wav(source_path: Path, target_path: Path) -> Path:
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    temp_target_path = target_path.with_suffix(f"{target_path.suffix}.tmp")
+    if temp_target_path.exists():
+        temp_target_path.unlink()
+
+    try:
+        with av.open(str(source_path), mode="r") as input_container:
+            input_stream = next(iter(input_container.streams.audio), None)
+            if input_stream is None:
+                raise ValueError(f"No audio stream found in {source_path}")
+
+            sample_rate = input_stream.codec_context.sample_rate or 48_000
+            layout = input_stream.codec_context.layout.name if input_stream.codec_context.layout else "mono"
+            resampler = av.AudioResampler(format="s16", layout=layout, rate=sample_rate)
+
+            with av.open(str(temp_target_path), mode="w", format="wav") as output_container:
+                output_stream = output_container.add_stream("pcm_s16le", rate=sample_rate)
+                output_stream.layout = layout
+
+                for frame in input_container.decode(input_stream):
+                    for resampled_frame in resampler.resample(frame):
+                        for packet in output_stream.encode(resampled_frame):
+                            output_container.mux(packet)
+
+                for packet in output_stream.encode(None):
+                    output_container.mux(packet)
+
+        temp_target_path.replace(target_path)
+    finally:
+        if temp_target_path.exists():
+            temp_target_path.unlink()
+
+    return target_path
 
 
 def convert_telegram_bot_message_to_chat_message(
@@ -308,7 +348,7 @@ class TelegramBotChannel(Channel):
         self._chat_infos[chat_id] = ChatInfo(channel_id=self.id, chat_id=chat_id, name=_chat_title(message))
 
         # download photo
-        photo_path: str | None = None
+        file_path: str | None = None
         if photo := message.photo:
             photos: list[PhotoSize] = list(photo)
             if photos:
@@ -317,17 +357,34 @@ class TelegramBotChannel(Channel):
                 target_path.parent.mkdir(parents=True, exist_ok=True)
 
                 if target_path.exists():
-                    photo_path = str(target_path)
+                    file_path = str(target_path)
                 else:
                     telegram_file = await largest_photo.get_file()
                     downloaded_path = await telegram_file.download_to_drive(custom_path=target_path)
-                    photo_path = str(downloaded_path)
+                    file_path = str(downloaded_path)
+
+        if voice := message.voice:
+            if voice.mime_type == "audio/ogg":
+                ogg_path = _VOICE_ATTACHMENT_DIR / f"{voice.file_unique_id}.ogg"
+                wav_path = _VOICE_ATTACHMENT_DIR / f"{voice.file_unique_id}.wav"
+                ogg_path.parent.mkdir(parents=True, exist_ok=True)
+
+                if not ogg_path.exists():
+                    telegram_file = await voice.get_file()
+                    await telegram_file.download_to_drive(custom_path=ogg_path)
+
+                if not wav_path.exists():
+                    _convert_ogg_to_wav(ogg_path, wav_path)
+
+                file_path = str(wav_path)
+            else:
+                self.logger.warning("Skipping Telegram voice message with unsupported MIME type: %s", voice.mime_type)
 
         # build message
         chat_message = convert_telegram_bot_message_to_chat_message(
             self.id,
             message,
-            attachments=[ChatMessageFilePart(path=photo_path)] if photo_path else None,
+            attachments=[ChatMessageFilePart(path=file_path)] if file_path else None,
             lifespan=self.build_message_lifespan(raw_chat_id=message.chat_id, raw_thread_id=message.message_thread_id),
         )
 
