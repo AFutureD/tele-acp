@@ -37,9 +37,7 @@ class AgentRuntimeHub:
             acp_config = await self.get_acp_config(assistant.agent_id)
             assert acp_config is not None, f"acp agent {assistant.agent_id} not found"
 
-            runtime = ACPAgentRuntime(
-                id, acp_config, cwd=assistant.work_dir or get_agent_work_dir(assistant.id), mcp_servers=self.convert_to_acp_mcp_servers()
-            )
+            runtime = ACPAgentRuntime(id, acp_config, cwd=assistant.work_dir or get_agent_work_dir(assistant.id), mcp_servers=self.convert_to_acp_mcp_servers())
         await self._stack.enter_async_context(runtime)
         self._runtimes[id] = runtime
 
@@ -68,6 +66,6 @@ class AgentRuntimeHub:
 
         ret = list[acp.schema.HttpMcpServer | acp.schema.SseMcpServer | acp.schema.McpServerStdio]()
         for mcp in mcp_servers:
-            ret.append(acp.schema.HttpMcpServer(headers=[], name=mcp.name, url=mcp.name, type="http"))
+            ret.append(acp.schema.HttpMcpServer(headers=[], name=mcp.name, url=mcp.url, type="http"))
 
         return ret

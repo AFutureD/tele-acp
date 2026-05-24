@@ -178,7 +178,7 @@ class CodexSDKRuntime(AgentRuntime):
         return thread
 
     async def new_session(self, instruction: str | None) -> str:
-        thread = await self._new_session_if_needed(instruction)
+        thread = await self._new_session(instruction)
         return thread.id
 
     async def model(self) -> str | None:

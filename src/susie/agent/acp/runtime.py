@@ -85,7 +85,7 @@ class ACPAgentRuntime(ACPAgentConnection, AgentRuntime):
             # issue: https://github.com/zed-industries/codex-acp/issues/203
             # _ = await self.connction.load_session(cwd=self._cwd, session_id=session_id)
 
-            self._session_id = new_session.session_id
+            self._session = new_session
             self.set_session_options(new_session.config_options)
 
             if instruction:
@@ -188,12 +188,16 @@ class ACPAgentRuntime(ACPAgentConnection, AgentRuntime):
         if not self.is_active:
             return
 
-        if session_id := self._session_id:
-            await self.connection.cancel(session_id)
+        if session := self._session:
+            await self.connection.cancel(session.session_id)
 
     async def _handle_session_update(self, session_id: str, update: ACPUpdateChunk) -> None:
         queue = self._update_queue
-        current_session_id = self._session_id
+        session = self._session
+        if session is None:
+            return
+
+        current_session_id = session.session_id
         if queue is None or current_session_id is None:
             return
 
