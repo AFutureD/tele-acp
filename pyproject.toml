@@ -21,7 +21,7 @@ dependencies = [
     # sdks
     "agent-client-protocol>=0.8.1",
     "mcp>=1.26.0",
-    "openai-codex>=0.131.0a4",
+    "openai-codex>=0.1.0b2",
     # cli
     "typer==0.24.1",
     "rich==14.3.3",
@@ -62,7 +62,6 @@ susie = { workspace = true }
 susie-core = { workspace = true }
 telegram-channel = { workspace = true }
 telegram-bot-channel = { workspace = true }
-openai-codex = { path = "vendor/codex/sdk/python" }
 
 [project.scripts]
 susie = "susie.cli:cli"

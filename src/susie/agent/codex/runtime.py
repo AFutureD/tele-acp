@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from openai_codex import ApprovalMode, AppServerConfig, AsyncCodex, AsyncThread, AsyncTurnHandle, TextInput
+from openai_codex import ApprovalMode, AsyncCodex, AsyncThread, AsyncTurnHandle, CodexConfig, TextInput
 from openai_codex.generated.v2_all import (
     AgentMessageThreadItem,
     CollabAgentToolCallThreadItem,
@@ -125,7 +125,7 @@ class CodexSDKRuntime(AgentRuntime):
         config += mcp_servers_cfg
 
         self._codex = AsyncCodex(
-            AppServerConfig(
+            CodexConfig(
                 config_overrides=config,
                 cwd=self.cwd,
                 client_name="tele-acp",
