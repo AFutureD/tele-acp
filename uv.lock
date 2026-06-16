@@ -1198,7 +1198,7 @@ requires-dist = [{ name = "pydantic", specifier = ">=2.12.5" }]
 
 [[package]]
 name = "tele-acp"
-version = "2026.4.0"
+version = "2026.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "agent-client-protocol" },
