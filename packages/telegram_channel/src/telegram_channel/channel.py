@@ -165,6 +165,10 @@ class TelegramChannel(Channel):
         return self._id
 
     @property
+    def message_syntax(self) -> str | None:
+        return None
+
+    @property
     async def status(self) -> bool:
         return await self._tele_client.is_user_authorized()
 

@@ -4,7 +4,7 @@ from susie.agent import AgentRuntimeHub
 from susie.command import CommandChain
 from susie.settings import Config
 
-from .assistant import AssistantReplier
+from .assistant import AssistantReplier, ChannelContext
 from .command import CommandReplier
 
 
@@ -15,7 +15,7 @@ class ChatReplierHub:
 
         self.settings: dict[str, AssistantConfig] = {assistant.id: assistant for assistant in config.assistants}
 
-    async def build_replier(self, replier_id: str, command_chain: CommandChain | None = None) -> ChatReplyable:
+    async def build_replier(self, replier_id: str, command_chain: CommandChain | None = None, channel_context: ChannelContext | None = None) -> ChatReplyable:
         assistant_id = replier_id
 
         assistant_settings = self.settings.get(assistant_id)
@@ -25,7 +25,7 @@ class ChatReplierHub:
         runtime = await self._acp_hub.spawn_acp_runtime(assistant_settings)
 
         assistant_replier = AssistantReplier(assistant_settings, runtime)
-        await assistant_replier.new_session()
+        await assistant_replier.new_session(channel_context)
 
         replier = CommandReplier(assistant_replier, command_chain)
         return replier

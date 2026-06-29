@@ -4,7 +4,7 @@ from susie_core import DEFAULT_ASSISTANT_ID, Chatable, ChatInfo, ChatMessage, Co
 
 from susie.channel.hub import ChannelHub
 from susie.command import CommandChain
-from susie.replier import ChatReplierHub
+from susie.replier import ChannelContext, ChatReplierHub
 from susie.settings import SUSIE_CHAT_ALL_INDICATOR, ChatSettings, Config
 
 from .chat import Chat
@@ -44,13 +44,15 @@ class ChatManager(Chatable):
 
         channel = self._channel_hub.require_channel(channel_id)
 
+        channel_context = ChannelContext(message_syntax=channel.message_syntax)
+
         # The Chat Settings
         binding = await self.get_binding(channel_id, chat_id)
 
         command_chain = CommandChain(self._command_chain)
         try:
             self.logger.info(f"Chat {channel_id} ({chat_id}) building replier")
-            replier = await self._replier_hub.build_replier(binding.assistant_id, command_chain)
+            replier = await self._replier_hub.build_replier(binding.assistant_id, command_chain, channel_context)
         except Exception as e:
             self.logger.error(f"build replier failed. error: {e}")
             raise

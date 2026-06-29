@@ -1,4 +1,4 @@
-from .assistant import AssistantReplier
+from .assistant import AssistantReplier, ChannelContext
 from .hub import ChatReplierHub
 
-__all__ = ["AssistantReplier", "ChatReplierHub"]
+__all__ = ["AssistantReplier", "ChatReplierHub", "ChannelContext"]

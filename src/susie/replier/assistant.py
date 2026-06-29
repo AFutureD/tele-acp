@@ -2,11 +2,17 @@ import contextlib
 import logging
 
 import jinja2
+from pydantic import BaseModel
 from susie_core import AssistantConfig, Chatable, ChatCommandResponder, ChatMessage, Command
 
 from susie.agent import AgentRuntime, AgentTurnStatus
 from susie.assistants import get_agents_dir
 from susie.constant import SUSIE_MCP_NAME
+
+
+class ChannelContext(BaseModel):
+    message_syntax: str | None
+
 
 PROMPT = (
     # Context Info
@@ -31,7 +37,7 @@ class AssistantReplier(ChatCommandResponder):
         self._acp_runtime = acp_runtime
         self.logger = logging.getLogger(__name__)
 
-    async def new_session(self) -> str:
+    async def new_session(self, channel_context: ChannelContext | None = None) -> str:
         lib_agent_path = get_agents_dir()
         env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(lib_agent_path),
@@ -39,7 +45,8 @@ class AssistantReplier(ChatCommandResponder):
         )
         template = env.get_template("SYSTEM.md")
 
-        instruction = template.render(SUSIE_MCP_NAME=SUSIE_MCP_NAME)
+        CHANNEL_CONTEXT = channel_context and channel_context.model_dump_json()
+        instruction = template.render(SUSIE_MCP_NAME=SUSIE_MCP_NAME, CHANNEL_CONTEXT=CHANNEL_CONTEXT)
 
         session_id = await self._acp_runtime.new_session(instruction)
         self.logger.info(f"new session: {session_id}")
@@ -84,9 +91,6 @@ class AssistantReplier(ChatCommandResponder):
         prompt = [content]
 
         self.logger.info(prompt)
-
-        # force cancel previous prompt turn
-        await self._acp_runtime.cancel()  # TODO: check time delta
 
         # start prompt request
         stream = self._acp_runtime.prompt(prompt)

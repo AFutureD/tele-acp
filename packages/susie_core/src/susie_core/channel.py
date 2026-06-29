@@ -22,6 +22,9 @@ class Channel(Protocol):
         """Channel ID"""
         ...
 
+    @property
+    def message_syntax(self) -> str | None: ...
+
     @contextlib.asynccontextmanager
     async def run_until_finish(self) -> AsyncIterator[Self]:
         yield self

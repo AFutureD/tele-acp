@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import contextlib
-import html
 import logging
 from collections import defaultdict, deque
 from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
+from importlib.resources import files
 from pathlib import Path
 from typing import Self
 
@@ -13,7 +13,7 @@ import av
 import telegram
 from susie_core import Channel, ChatInfo, ChatMessage, ChatMessageBlockQuote, ChatMessageFilePart, ChatMessagePart, ChatMessageTextPart
 from telegram import Message, MessageEntity, PhotoSize, Update, User
-from telegram.constants import ChatAction, ParseMode
+from telegram.constants import ChatAction
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, MessageHandler, filters
 
 from .bot_action import _TelegramBotChatAction
@@ -25,42 +25,28 @@ _TMP_ATTACHMENT_DIR = Path("/tmp/susie/attachments")
 _PHOTO_ATTACHMENT_DIR = _TMP_ATTACHMENT_DIR / "photos"
 _VOICE_ATTACHMENT_DIR = _TMP_ATTACHMENT_DIR / "voices"
 
+_MESSAGE_SYNTAX = files(__package__).joinpath("RICH_MESSAGE_MARKDOWN_SYNTAX.md").read_text(encoding="utf-8")
 
-def _render_message_as_html(message: ChatMessage) -> str:
-    msg = ""
+
+def _render_message_as_markdown(message: ChatMessage) -> str:
+    # https://core.telegram.org/bots/api#rich-messages
+    chunks: list[str] = []
     for part in message.parts:
         match part:
             case ChatMessageTextPart():
-                msg += html.escape(part.text)
+                if part.text:
+                    chunks.append(part.text)
 
             case ChatMessageBlockQuote():
-                # https://core.telegram.org/bots/api#html-style
-                title = html.escape(part.title)
-                body = html.escape(part.body)
-                msg += f"<blockquote expandable>{title}\n{body}</blockquote>"
-                msg += "\n"
+                # Inside <details>, the body is still parsed as Markdown.
+                title = part.title
+                body = part.body
+                chunks.append(f"<details><summary>{title}</summary>{body}</details>")
 
             case ChatMessageFilePart():
                 pass
 
-    return msg
-
-
-def _render_message_as_plain_text(message: ChatMessage) -> str:
-    msg = ""
-    for part in message.parts:
-        match part:
-            case ChatMessageTextPart():
-                msg += part.text
-
-            case ChatMessageBlockQuote():
-                msg += f"{part.title}\n{part.body}"
-                msg += "\n"
-
-            case ChatMessageFilePart():
-                pass
-
-    return msg
+    return "\n\n".join(chunks)
 
 
 def create_chat_id(type: str, chat_id: str | int, thread_id: int | None) -> str:
@@ -258,6 +244,10 @@ class TelegramBotChannel(Channel):
         return self._id
 
     @property
+    def message_syntax(self) -> str | None:
+        return _MESSAGE_SYNTAX
+
+    @property
     async def status(self) -> bool:
         try:
             _ = await self.get_me()
@@ -292,19 +282,21 @@ class TelegramBotChannel(Channel):
 
         reply_to_message_id = int(message.reply_to) if message.reply_to and message.reply_to.isdecimal() else None
 
-        raw_msg = _render_message_as_plain_text(message)
-        self.logger.debug("send_message raw text: %s", raw_msg)
-
-        msg = _render_message_as_html(message)
+        msg = _render_message_as_markdown(message)
+        self.logger.debug("send_message markdown: %s", msg)
 
         if msg:
-            await self._application.bot.send_message(
-                chat_id=raw_chat_id,
-                text=msg,
-                parse_mode=ParseMode.HTML,
-                reply_to_message_id=reply_to_message_id,
-                message_thread_id=raw_thread_id,
-            )
+            # https://core.telegram.org/bots/api#sendrichmessage
+            api_kwargs: dict = {
+                "chat_id": raw_chat_id,
+                "rich_message": {"markdown": msg},
+            }
+            if raw_thread_id is not None:
+                api_kwargs["message_thread_id"] = raw_thread_id
+            if reply_to_message_id is not None:
+                api_kwargs["reply_parameters"] = {"message_id": reply_to_message_id}
+
+            await self._application.bot.do_api_request("sendRichMessage", api_kwargs=api_kwargs)
 
         for file_path in files:
             with open(file_path, "rb") as file:
