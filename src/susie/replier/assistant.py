@@ -61,9 +61,9 @@ class AssistantReplier(ChatCommandResponder):
             current = await self._acp_runtime.model()
             if not opts:
                 return f"current: {current}\n\nNo model options available for this runtime."
-            lines = [f"{x.value}: {x.name}" for x in opts]
+            lines = [f"{x.value}: {x.name}\n\n" for x in opts]
 
-            return f"current: {current}\n\n" + ("\n".join(lines))
+            return f"current: {current}\n\n\n" + ("\n".join(lines))
 
         ret = await self._acp_runtime.set_model(value)
         return "ok" if ret else "failed"

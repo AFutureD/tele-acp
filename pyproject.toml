@@ -21,7 +21,7 @@ dependencies = [
     # sdks
     "agent-client-protocol>=0.8.1",
     "mcp>=1.26.0",
-    "openai-codex>=0.1.0b2",
+    "openai-codex>=0.1.0b3",
     # cli
     "typer==0.24.1",
     "rich==14.3.3",
